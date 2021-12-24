@@ -7,12 +7,9 @@
 project TeamFortressLib
 	: requirements <include>./
 	: requirements <include>../Common
-	: requirements <include>../dependencies/zlib
-	: requirements <include>../dependencies/bzip2-1.0.3	
-	: requirements <include>../dependencies/sqlite-3.2.8
 	;
 
-SOURCES = [ glob *.cpp ] ;
+SOURCES = [ glob TF_BatchBuild.cpp ] ;
 
 lib TeamFortressLib : $(SOURCES) 
 		 : <link>static <toolset>gcc:<cflags>-w <cflags>-pthread

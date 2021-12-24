@@ -64,9 +64,10 @@ rule tag ( name : type ? : property-set )
 
 build-project Common ; 
 #build-project MC ;
-build-project ET ;
-build-project RTCW ; 
-#build-project TeamFortressLib ; 
+#build-project ET ; 
+#build-project RTCW ; 
+build-project TeamFortressLib ; 
+build-project ETF ;
 #build-project FF ; 
 #build-project D3 ; 
 #build-project Q4 ; 
