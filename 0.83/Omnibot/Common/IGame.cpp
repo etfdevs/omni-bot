@@ -63,7 +63,7 @@ IGame::~IGame()
 
 const char *IGame::GetVersion() const
 {
-	return "0.87.1";
+	return "0.9";
 }
 
 const char *IGame::GetVersionDateTime() const
@@ -302,7 +302,7 @@ static IntEnum Generic_RoleEnum[] =
 	IntEnum("ATTACKER"			,0),
 	IntEnum("DEFENDER"			,1),
 	IntEnum("ROAMER"			,2),
-	IntEnum("INFILTRATOR"		,3), // the constant must be same as in function Client.IsInfiltrator
+	IntEnum("INFILTRATOR"		,3), // the constant must be same as in functions Client.IsInfiltrator and gmBot::gmfClearRoles
 	IntEnum("SNIPER"			,4),
 	IntEnum("AMBUSHER"			,5),
 	IntEnum("TEAMCAPTAIN"		,6),
@@ -570,11 +570,11 @@ void IGame::InitScriptContentFlags(gmMachine *_machine, gmTableObject *_table)
 	_table->Set(_machine, "WATER",	gmVariable(CONT_WATER));
 	_table->Set(_machine, "SLIME",	gmVariable(CONT_SLIME));
 	_table->Set(_machine, "FOG",	gmVariable(CONT_FOG));
-
 	_table->Set(_machine, "TELEPORTER",	gmVariable(CONT_TELEPORTER));
 	_table->Set(_machine, "MOVER",	gmVariable(CONT_MOVER));
 	_table->Set(_machine, "TRIGGER",gmVariable(CONT_TRIGGER));
 	_table->Set(_machine, "LAVA",	gmVariable(CONT_LAVA));
+	_table->Set(_machine, "PLAYERCLIP",	gmVariable(CONT_PLYRCLIP));
 }
 
 void IGame::InitScriptSurfaceFlags(gmMachine *_machine, gmTableObject *_table)
@@ -661,7 +661,7 @@ void IGame::UpdateGame()
 		m_StateRoot->RootUpdate();
 	}
 
-	obstacleManager.Update();
+	//obstacleManager.Update();
 
 	// This is called often to update the state of the bots and perform their "thinking"
 	for(int i = 0; i < Constants::MAX_PLAYERS; ++i)
@@ -812,10 +812,10 @@ void IGame::ProcessEvent(const MessageHelper &_message, CallbackParameters &_cb)
 					break;
 				}
 
-				if(m->m_EntityCategory.CheckFlag(ENT_CAT_OBSTACLE))
-				{
-					obstacleManager.AddObstacle( m->m_Entity );
-				}
+				//if(m->m_EntityCategory.CheckFlag(ENT_CAT_OBSTACLE))
+				//{
+				//	obstacleManager.AddObstacle( m->m_Entity );
+				//}
 
 				m_GameEntities[index].m_Entity = m->m_Entity;
 				m_GameEntities[index].m_EntityClass = m->m_EntityClass;
@@ -840,7 +840,7 @@ void IGame::ProcessEvent(const MessageHelper &_message, CallbackParameters &_cb)
 			const Event_EntityDeleted *m = _message.Get<Event_EntityDeleted>();
 			if(m)
 			{
-				obstacleManager.RemoveObstacle(m->m_Entity);
+				//obstacleManager.RemoveObstacle(m->m_Entity);
 
 				int index = m->m_Entity.GetIndex();
 				if(m_GameEntities[index].m_Entity.IsValid())

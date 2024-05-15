@@ -277,6 +277,11 @@ void GoalManager::Query::FromTable(gmMachine *a_machine, gmTableObject *a_table)
 			SkipInUse(var.GetInt()!=0);
 	}
 	{
+		gmVariable var = a_table->Get(a_machine,"CheckRange");
+		if(var.IsInt())
+			CheckRangeProperty(var.GetInt()!=0);
+	}
+	{
 		gmVariable var = a_table->Get(a_machine,"NoFilters");
 		if(var.IsInt() && var.GetInt()!=0)
 			NoFilters();
@@ -900,12 +905,7 @@ bool GoalManager::Load(const String &_map, ErrorObj &_err)
 	pMachine->GetGlobals()->Set(pMachine,MapGoalTable,gmVariable::s_null);
 	if(ScriptManager::GetInstance()->ExecuteFile(script, ThreadId))
 	{
-		
-		const char* dir = PHYSFS_getRealDir(script.c_str());
-		if(dir) {
-			const char* nav = strstr(dir, "incomplete_navs");
-			if(nav) m_NavDir = nav;
-		}
+		PathPlannerWaypoint::SetNavDir(m_NavDir, script.c_str());
 
 		//////////////////////////////////////////////////////////////////////////
 		// remove old goals.
@@ -938,10 +938,6 @@ bool GoalManager::Load(const String &_map, ErrorObj &_err)
 					gmTableObject *mgTbl = pNode->m_value.GetTableObjectSafe();
 					if(mgTbl)
 					{
-						//copy file version to goal version
-						if(mgTbl->Get(pMachine, "Version").IsNull()) 
-							mgTbl->Set(pMachine, "Version", gmVersion);
-
 						//copy table key to goal name
 						String goalName;
 						gmVariable gmName = mgTbl->Get(pMachine, "Name");
@@ -956,11 +952,6 @@ bool GoalManager::Load(const String &_map, ErrorObj &_err)
 						const String goalType = mgTbl->Get(pMachine, "GoalType").GetCStringSafe("");
 						if(!goalType.empty() && !goalName.empty())
 						{
-							//set TagName from Name
-							if(mgTbl->Get(pMachine, "TagName").IsNull() && goalName.length() - goalType.length() > 1){
-								mgTbl->Set(pMachine, "TagName", goalName.c_str()+goalType.length()+1);
-							}
-
 							// if the goal exists already
 							gmGCRoot<gmTableObject> goalTbl(mgTbl,pMachine);
 							MapGoalPtr existingGoal = GetGoal(goalName);
@@ -1034,8 +1025,9 @@ bool GoalManager::Load(const String &_map, ErrorObj &_err)
 	pMachine->GetGlobals()->Set(pMachine,MapGoalTable,gmVariable::s_null);
 	pMachine->CollectGarbage(true);
 
-	_err.AddInfo("%d Goals Loaded, %d Goals Deferred, %d Goals could not load. elapsed time: %.2f seconds",
-		GoalsLoaded,GoalsDeferred,GoalsLoadedFailed,loadTime.GetElapsedSeconds());
+	if(GoalsLoadedFailed > 0) _err.AddError("%d Goals could not load", GoalsLoadedFailed);
+	_err.AddInfo("%d Goals Loaded, %d Goals Deferred. elapsed time: %.2f seconds",
+		GoalsLoaded,GoalsDeferred,loadTime.GetElapsedSeconds());
 
 	return LoadedOk;
 }
@@ -1330,7 +1322,7 @@ void GoalManager::Update()
 		if(HighlightedGoal)
 		{
 			Utils::DrawRadius(
-				HighlightedGoal->GetPosition()+Vector3f(0,0,32.f),
+				HighlightedGoal->GetPosition().AddZ(32.f),
 				HighlightedGoal->GetRadius(),
 				COLOR::YELLOW,
 				IGame::GetDeltaTimeSecs()*2.f);
@@ -1834,4 +1826,20 @@ void GoalManager::GetGoals(Query &_qry)
 		}
 	}
 	_qry.OnQueryFinish();
+}
+
+int GoalManager::Iterate(const char* expression, std::function<void(MapGoal*)> action)
+{
+	bool all = !expression || !*expression;
+	int n = 0;
+	for(MapGoalList::iterator it = m_MapGoalList.begin(), itEnd = m_MapGoalList.end(); it != itEnd; ++it)
+	{
+		if((all || Utils::RegexMatch(expression, (*it)->GetName().c_str())) 
+			&& !(*it)->GetDisabled() && !(*it)->GetDeleteMe())
+		{
+			action(it->get());
+			n++;
+		}
+	}
+	return n;
 }

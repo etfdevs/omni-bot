@@ -132,15 +132,13 @@ void PathPlannerWaypoint::cmdWaypointAdd(const StringVector &_args)
 		return;
 
 	// get the position of the localhost
-	Vector3f vPosition, vFacing;
+	Vector3f vPosition;
 	g_EngineFuncs->GetEntityPosition(Utils::GetLocalEntity(), vPosition);
-	g_EngineFuncs->GetEntityOrientation(Utils::GetLocalEntity(), vFacing, 0, 0);
 
 	// Add this waypoint to the list.
 	ScriptManager::GetInstance()->ExecuteStringLogged(
-		(String)va("Wp.AddWaypoint( Vector3(%f, %f, %f), Vector3(%f, %f, %f) );", 
-		vPosition.x, vPosition.y, vPosition.z,
-		vFacing.x, vFacing.y, vFacing.z));
+		(String)va("Wp.AddWaypoint( Vector3(%f, %f, %f));", 
+		vPosition.x, vPosition.y, vPosition.z));
 }
 
 void PathPlannerWaypoint::cmdWaypointAddX(const StringVector &_args)
@@ -395,12 +393,12 @@ void PathPlannerWaypoint::cmdWaypointAutoRadius(const StringVector &_args)
 		// First get a point down from this waypoint slightly above the ground.
 		Vector3f vStartPosition = (*it)->GetPosition();
 
-		Vector3f vEndPosition = vStartPosition + (-Vector3f::UNIT_Z * 1000.0f);
+		Vector3f vEndPosition = vStartPosition.AddZ(-1000);
 		obTraceResult tr;
 		EngineFuncs::TraceLine(tr, vStartPosition, vEndPosition, NULL, TR_MASK_SOLID, 0, False);	
 		if(tr.m_Fraction < 1.0)
 		{
-			vStartPosition = Vector3f(tr.m_Endpos) + Vector3f::UNIT_Z * fTestHeight;
+			vStartPosition = Vector3f(tr.m_Endpos).AddZ(fTestHeight);
 		}
 
 		float fClosestHit = fMaxRadius;
@@ -410,11 +408,11 @@ void PathPlannerWaypoint::cmdWaypointAutoRadius(const StringVector &_args)
 			Vector3f start = vStartPosition;
 			Vector3f end = (*it)->GetPosition() + Quaternionf(Vector3f::UNIT_Z, fAng).Rotate(ray);
 
-			obTraceResult tr;
-			EngineFuncs::TraceLine(tr, start, end, NULL, TR_MASK_SOLID, 0, False);
-			if(tr.m_Fraction < 1.0f)
+			obTraceResult tr2;
+			EngineFuncs::TraceLine(tr2, start, end, NULL, TR_MASK_SOLID, 0, False);
+			if(tr2.m_Fraction < 1.0f)
 			{
-				float fDistance = (start - end).Length() * tr.m_Fraction;
+				float fDistance = (start - end).Length() * tr2.m_Fraction;
 				if(fDistance < fClosestHit)
 				{
 					fClosestHit = fDistance;					
@@ -503,8 +501,8 @@ void PathPlannerWaypoint::cmdWaypointAutoBuild(const StringVector &_args)
 
 			// Use the bounding box if iUseBBox is enabled
 			EngineFuncs::TraceLine(tr, 
-				(m_WaypointList[i]->GetPosition() + Vector3f(0,0,40)),
-				(m_WaypointList[j]->GetPosition() + Vector3f(0,0,40)), 
+				(m_WaypointList[i]->GetPosition().AddZ(40)),
+				(m_WaypointList[j]->GetPosition().AddZ(40)), 
 				(bUseBBox ? &bbox : NULL), (TR_MASK_SOLID | TR_MASK_PLAYERCLIP), -1, True);
 			++iNumRayCasts;
 
@@ -573,7 +571,7 @@ void PathPlannerWaypoint::cmdWaypointView(const StringVector &_args)
 {
 	if(_args.size() >= 2)
 	{
-		if(Utils::StringToTrue(_args[1]))
+		if(Utils::StringToTrue(_args[1]) || _args[1] == "toggle" && !m_PlannerFlags.CheckFlag(NAV_VIEW))
 		{
 			m_PlannerFlags.SetFlag(NAV_VIEW);
 			const char * msg = IGameManager::GetInstance()->GetGame()->IsDebugDrawSupported();
@@ -582,52 +580,44 @@ void PathPlannerWaypoint::cmdWaypointView(const StringVector &_args)
 				return;
 			}
 		}
-		else if(Utils::StringToFalse(_args[1]))
+		else if(Utils::StringToFalse(_args[1]) || _args[1] == "toggle")
 		{
 			m_PlannerFlags.ClearFlag(NAV_VIEW);
 
 			if(g_ClientFuncs) g_ClientFuncs->ClearView();
 		}
-
-		EngineFuncs::ConsoleMessage(va("Waypoint Visible %s",
-			m_PlannerFlags.CheckFlag(NAV_VIEW) ? "on." : "off."));
 	}
+	EngineFuncs::ConsoleMessage(va("Waypoint Visible %s.", m_PlannerFlags.CheckFlag(NAV_VIEW) ? "on" : "off"));
 }
 
 void PathPlannerWaypoint::cmdWaypointAutoFlag(const StringVector &_args)
 {
-	if(_args.size() >= 2)
+	if(!m_PlannerFlags.CheckFlag(NAV_AUTODETECTFLAGS) && (_args.size() < 2 || Utils::StringToTrue(_args[1])))
 	{
-		if(!m_PlannerFlags.CheckFlag(NAV_AUTODETECTFLAGS) && Utils::StringToTrue(_args[1]))
-		{
-			m_PlannerFlags.SetFlag(NAV_AUTODETECTFLAGS);
-		}
-		else if(m_PlannerFlags.CheckFlag(NAV_AUTODETECTFLAGS) && Utils::StringToFalse(_args[1]))
-		{
-			m_PlannerFlags.ClearFlag(NAV_AUTODETECTFLAGS);
-		}
-
-		EngineFuncs::ConsoleMessage(va("Waypoint Autoflag %s",
-			m_PlannerFlags.CheckFlag(NAV_AUTODETECTFLAGS) ? "on." : "off."));
+		m_PlannerFlags.SetFlag(NAV_AUTODETECTFLAGS);
 	}
+	else if(m_PlannerFlags.CheckFlag(NAV_AUTODETECTFLAGS) && (_args.size() < 2 || Utils::StringToFalse(_args[1])))
+	{
+		m_PlannerFlags.ClearFlag(NAV_AUTODETECTFLAGS);
+	}
+
+	EngineFuncs::ConsoleMessage(va("Waypoint Autoflag %s",
+		m_PlannerFlags.CheckFlag(NAV_AUTODETECTFLAGS) ? "on." : "off."));
 }
 
 void PathPlannerWaypoint::cmdWaypointViewFacing(const StringVector &_args)
 {
-	if(_args.size() >= 2)
+	if(!m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) && (_args.size() < 2 || Utils::StringToTrue(_args[1])))
 	{
-		if(!m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) && Utils::StringToTrue(_args[1]))
-		{
-			m_PlannerFlags.SetFlag(WAYPOINT_VIEW_FACING);
-		}
-		else if(m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) && Utils::StringToFalse(_args[1]))
-		{
-			m_PlannerFlags.ClearFlag(WAYPOINT_VIEW_FACING);
-		}
-
-		EngineFuncs::ConsoleMessage(va("Waypoint Facing Visible %s",
-			m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) ? "on." : "off."));
+		m_PlannerFlags.SetFlag(WAYPOINT_VIEW_FACING);
 	}
+	else if(m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) && (_args.size() < 2 || Utils::StringToFalse(_args[1])))
+	{
+		m_PlannerFlags.ClearFlag(WAYPOINT_VIEW_FACING);
+	}
+
+	EngineFuncs::ConsoleMessage(va("Waypoint Facing Visible %s",
+		m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) ? "on." : "off."));
 }
 
 void PathPlannerWaypoint::cmdWaypointSetProperty(const StringVector &_args)
@@ -1143,7 +1133,7 @@ void PathPlannerWaypoint::cmdWaypointMirror(const StringVector &_args)
 
 	// Update the connection pointers.
 	{
-		WaypointList::iterator it = mirroredWaypoints.begin(), itEnd = mirroredWaypoints.end();
+		it = mirroredWaypoints.begin(), itEnd = mirroredWaypoints.end();
 		for( ; it != itEnd; ++it)
 		{
 			Waypoint::ConnectionList::iterator conIt = (*it)->m_Connections.begin(), 
@@ -1491,58 +1481,57 @@ void PathPlannerWaypoint::cmdWaypointAddFlag_Helper(const StringVector &_args, W
 	if(!_waypoint)
 		return;
 
+	NavFlags deprecatedFlags = IGameManager::GetInstance()->GetGame()->DeprecatedNavigationFlags();
 	bool bPrintFlagList = true;
 
 	// Add the flags to the waypoint.
 	if(_args.size() >= 2)
 	{
 		// to support adding multiple flags in a single line, lets loop through all the tokens
-		for(unsigned int iToken = 1; iToken < _args.size(); ++iToken)
+		StringVector::const_iterator token = _args.begin();
+		for(++token; token != _args.end(); ++token)
 		{
 			// Look for this token in the map.
-			FlagMap::const_iterator it = m_WaypointFlags.find(_args[iToken]);
-			if(it != m_WaypointFlags.end())
+			FlagMap::const_iterator it = m_WaypointFlags.find(*token);
+			if(it != m_WaypointFlags.end() && (!(it->second & deprecatedFlags) || _waypoint->IsFlagOn(it->second)))
 			{
 				// Get the local characters position
-				if(_waypoint)
+				if(!_waypoint->IsFlagOn(it->second))
 				{
-					if(!_waypoint->IsFlagOn(it->second))
-					{
-						_waypoint->AddFlag(it->second);
-						EngineFuncs::ConsoleMessage(va("%s Flag added to waypoint.", _args[iToken].c_str()));
-					} 
-					else
-					{
-						_waypoint->RemoveFlag(it->second);
-						EngineFuncs::ConsoleMessage(va("%s Flag removed from waypoint.", _args[iToken].c_str()));
+					_waypoint->AddFlag(it->second);
+					EngineFuncs::ConsoleMessage(va("%s Flag added to waypoint.", token->c_str()));
+				} 
+				else
+				{
+					_waypoint->RemoveFlag(it->second);
+					EngineFuncs::ConsoleMessage(va("%s Flag removed from waypoint.", token->c_str()));
 
-						//open connections if blockable flag is removed
-						if ((it->second & m_BlockableMask) != 0) ClearBlockable(_waypoint);
-					}
-
-					// Team flags have a somewhat special case.
-					// If no team flags are enable, make sure the teamonly flag is disable as well.
-					if(!_waypoint->IsAnyFlagOn(F_NAV_TEAM_ALL))
-					{
-						if(_waypoint->IsFlagOn(F_NAV_TEAMONLY))
-						{
-							_waypoint->RemoveFlag(F_NAV_TEAMONLY);
-							EngineFuncs::ConsoleMessage("Waypoint no longer team specific.");
-						}
-					} else
-					{
-						// At least one of them is on, so make sure the teamonly flag is set.
-						_waypoint->AddFlag(F_NAV_TEAMONLY);
-					}
-
-					BuildBlockableList();
-					BuildSpatialDatabase();
+					//open connections if blockable flag is removed
+					if ((it->second & m_BlockableMask) != 0) ClearBlockable(_waypoint);
 				}
+
+				// Team flags have a somewhat special case.
+				// If no team flags are enable, make sure the teamonly flag is disable as well.
+				if(!_waypoint->IsAnyFlagOn(F_NAV_TEAM_ALL))
+				{
+					if(_waypoint->IsFlagOn(F_NAV_TEAMONLY))
+					{
+						_waypoint->RemoveFlag(F_NAV_TEAMONLY);
+						EngineFuncs::ConsoleMessage("Waypoint no longer team specific.");
+					}
+				} else
+				{
+					// At least one of them is on, so make sure the teamonly flag is set.
+					_waypoint->AddFlag(F_NAV_TEAMONLY);
+				}
+
+				BuildBlockableList();
+				BuildSpatialDatabase();
 				bPrintFlagList = false;
 			} 
 			else
 			{
-				EngineFuncs::ConsoleError(va("Invalid flag: %s.", _args[iToken].c_str()));
+				EngineFuncs::ConsoleError(va("Invalid flag: %s.", token->c_str()));
 			}
 		}		
 	} else
@@ -1556,7 +1545,8 @@ void PathPlannerWaypoint::cmdWaypointAddFlag_Helper(const StringVector &_args, W
 		EngineFuncs::ConsoleMessage("Waypoint Flag List.");
 		FlagMap::const_iterator it = m_WaypointFlags.begin();
 		for( ; it != m_WaypointFlags.end(); ++it)
-			EngineFuncs::ConsoleMessage(va("%s", it->first.c_str()));
+			if(!(it->second & deprecatedFlags))
+				EngineFuncs::ConsoleMessage(va("%s", it->first.c_str()));
 	}
 }
 
@@ -1941,11 +1931,11 @@ void PathPlannerWaypoint::cmdAutoBuildFeatures(const StringVector &_args)
 		}
 		
 		//////////////////////////////////////////////////////////////////////////
-		Utils::DrawLine(vPos, vPos+Vector3f::UNIT_Z * 32.f, COLOR::GREEN, fTime);
+		Utils::DrawLine(vPos, vPos.AddZ(32), COLOR::GREEN, fTime);
 		if(vPos != vTarget)
 		{
 			Utils::DrawLine(vPos, vTarget, COLOR::MAGENTA, fTime);
-			Utils::DrawLine(vTarget, vTarget+Vector3f::UNIT_Z * 32.f, COLOR::RED, fTime);
+			Utils::DrawLine(vTarget, vTarget.AddZ(32), COLOR::RED, fTime);
 		}
 		if(!features[i].m_Bounds.IsZero())
 			Utils::OutlineAABB(features[i].m_Bounds, COLOR::GREEN, fTime);
@@ -1971,7 +1961,7 @@ void PathPlannerWaypoint::cmdBoxSelect(const StringVector &_args)
 		}
 		else
 		{
-			AABB boxselect(m_BoxStart, vAimPos);
+			boxselect.Set(m_BoxStart, vAimPos);
 			Utils::OutlineAABB(boxselect, COLOR::MAGENTA, 2.f,AABB::DIR_BOTTOM);
 
 			boxselect.m_Mins[2] = -4096.f;
@@ -2053,13 +2043,10 @@ void PathPlannerWaypoint::cmdWaypointSplit(const StringVector &_args)
 		return;
 	}
 	
-	Vector3f p0 = wp0->GetPosition(); 
-	Vector3f p1 = wp1->GetPosition(); 
-	
 	const float fMid = (g_fTopWaypointOffset + g_fBottomWaypointOffset) / 2;
-	p0 += Vector3f(0.f,0.f,fMid);
-	p1 += Vector3f(0.f,0.f,fMid);
-
+	Vector3f p0 = wp0->GetPosition().AddZ(fMid); 
+	Vector3f p1 = wp1->GetPosition().AddZ(fMid); 
+	
 	// find point on connection which is near player
 	Vector3f d = p1 - p0;
 	p = (p-p1).Dot(d) / d.SquaredLength() * d + p1;
@@ -2122,8 +2109,6 @@ void PathPlannerWaypoint::cmdWaypointGround(const StringVector &_args)
 	if(!m_PlannerFlags.CheckFlag(NAV_VIEW))
 		return;
 
-	const float fWpHeight = g_fTopWaypointOffset - g_fBottomWaypointOffset;
-
 	/*const char *strUsage[] = 
 	{ 
 		"waypoint_ground",
@@ -2139,7 +2124,7 @@ void PathPlannerWaypoint::cmdWaypointGround(const StringVector &_args)
 		if(w->GetNavigationFlags() & NO_GROUND_FLAGS)
 			continue;
 
-		Vector3f wpmid = w->GetPosition() + Vector3f(0.f,0.f,g_fBottomWaypointOffset+fWpHeight*0.5f);
+		Vector3f wpmid = w->GetPosition().AddZ((g_fTopWaypointOffset + g_fBottomWaypointOffset)/2);
 
 		Vector3f np;
 		if(GroundPosition(np,wpmid,true))

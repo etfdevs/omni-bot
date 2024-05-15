@@ -1,2 +1,9 @@
-.vscode
-**/build/
+.DS_Store
+.idea/
+.vscode/
+.vs/
+*.vcxproj.user
+/0.83/Omnibot/build/
+/0.83/Omnibot/projects/msvc12/build/
+/0.83/GameInterfaces/*/src/build/
+/0.83/Installer/Files/rtcw/scripts/rtcw_autoexec_user.gm

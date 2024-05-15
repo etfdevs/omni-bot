@@ -128,6 +128,8 @@ public:
 
 	void FireTrigger(const EntityInstance &_ent)
 	{
+		if(Expired()) return;
+
 		InTrigger *it = NULL;
 
 		// If it's already in the trigger, just update the timestamp.
@@ -145,13 +147,10 @@ public:
 
 		if(it)
 		{
-			if(!DeleteMe())
-			{
-				// otherwise add it to the list of entities in trigger, and fire an enter event.
-				it->m_Entity = _ent.m_Entity;
-				it->m_TimeStamp = IGame::GetTime();
-				FireEnterEvent(_ent.m_Entity);
-			}
+			// otherwise add it to the list of entities in trigger, and fire an enter event.
+			it->m_Entity = _ent.m_Entity;
+			it->m_TimeStamp = IGame::GetTime();
+			FireEnterEvent(_ent.m_Entity);
 		}
 		else
 		{
@@ -171,7 +170,6 @@ public:
 
 				m_InTrigger[i].m_Entity.Reset();
 				m_InTrigger[i].m_TimeStamp = 0;
-				return;
 			}
 		}
 	}
@@ -224,11 +222,11 @@ public:
 			}
 			else
 			{
-				gmTableObject *tbl = vTriggerOnClass.GetTableObjectSafe();
-				if(tbl)
+				gmTableObject *tbl2 = vTriggerOnClass.GetTableObjectSafe();
+				if(tbl2)
 				{
 					gmTableIterator tIt;
-					gmTableNode *pNode = tbl->GetFirst(tIt);
+					gmTableNode *pNode = tbl2->GetFirst(tIt);
 					while(pNode)
 					{
 						if(pNode->m_value.IsInt())
@@ -243,7 +241,7 @@ public:
 								}
 							}
 						}
-						pNode = tbl->GetNext(tIt);
+						pNode = tbl2->GetNext(tIt);
 					}
 				}
 			}
@@ -257,18 +255,18 @@ public:
 			}
 			else
 			{
-				gmTableObject *tbl = vTriggerOnCategory.GetTableObjectSafe();
-				if(tbl)
+				gmTableObject *tbl2 = vTriggerOnCategory.GetTableObjectSafe();
+				if(tbl2)
 				{
 					gmTableIterator tIt;
-					gmTableNode *pNode = tbl->GetFirst(tIt);
+					gmTableNode *pNode = tbl2->GetFirst(tIt);
 					while(pNode)
 					{
 						if(pNode->m_value.IsInt())
 						{
 							m_TriggerOnCategory.SetFlag(pNode->m_value.GetInt(),true);
 						}
-						pNode = tbl->GetNext(tIt);
+						pNode = tbl2->GetNext(tIt);
 					}
 				}
 			}
@@ -282,11 +280,11 @@ public:
 			}
 			else
 			{
-				gmTableObject *tbl = vTriggerOnEntity.GetTableObjectSafe();
-				if(tbl)
+				gmTableObject *tbl2 = vTriggerOnEntity.GetTableObjectSafe();
+				if(tbl2)
 				{
 					gmTableIterator tIt;
-					gmTableNode *pNode = tbl->GetFirst(tIt);
+					gmTableNode *pNode = tbl2->GetFirst(tIt);
 					while(pNode)
 					{
 						if(pNode->m_value.IsEntity())
@@ -298,7 +296,7 @@ public:
 									m_TriggerOnEntity[i].FromInt(pNode->m_value.GetEntity());
 								}
 						}
-						pNode = tbl->GetNext(tIt);
+						pNode = tbl2->GetNext(tIt);
 					}
 				}
 			}

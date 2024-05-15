@@ -85,6 +85,7 @@ public:
 	void Update();
 	void Shutdown();
 	bool IsReady() const;
+	void DrawActiveFrame();
 
 	int GetLatestFileVersion() const;
 
@@ -97,11 +98,10 @@ public:
 	inline const FlagMap &GetNavFlagMap() const { return m_WaypointFlags; }
 
 	Waypoint *GetWaypointByName(const String &_name) const;
+	void GetWaypointsByName(const String &_name, WaypointList &_list) const;
 	void GetWaypointsByExpr(const String &_expr, WaypointList &_list) const;
 	Waypoint *GetWaypointByGUID(obuint32 _uid) const;
 	Waypoint *_GetClosestWaypoint(const Vector3f &_pos, const NavFlags _team, const int _options, int *_index = NULL) const;
-
-	void RunPathQuery(const PathQuery &_qry);
 
 	Vector3f GetRandomDestination(Client *_client, const Vector3f &_start, const NavFlags _team);
 
@@ -114,6 +114,7 @@ public:
 	bool Load(const String &_mapname, bool _dl = true);
 	bool Save(const String &_mapname);
 	void Unload();
+	static void SetNavDir(String &navDir, const char *_file);
 
 	void GetPath(Path &_path, int _smoothiterations);
 
@@ -121,6 +122,9 @@ public:
 	Waypoint *AddWaypoint(const Vector3f &_pos, const Vector3f &_facing = Vector3f::ZERO, bool _blockdupe = false);
 	bool DeleteWaypoint(const Vector3f &_pos);
 	void DeleteWaypoint(Waypoint *pDeleteMe);
+
+	bool _ConnectWaypoints(Waypoint *_wp1, Waypoint *_wp2);
+	bool _DisConnectWaypoints(Waypoint *_wp1, Waypoint *_wp2);
 
 	void RegisterNavFlag(const String &_name, const NavFlags &_func);
 	//void RegisterLinkFlag(const String &_name, const NavFlags &_func);
@@ -193,6 +197,7 @@ public:
 	//void BuildVisTable();
 	void BuildBlockableList();
 	void ClearBlockable(Waypoint* _waypoint);
+	int CheckBlockable();
 
 	const char *GetPlannerName() const { return "Waypoint Path Planner"; } ;
 	int GetPlannerType() const { return NAVID_WP; };
@@ -229,7 +234,6 @@ protected:
 
 	int					m_SelectedWaypoint;
 	Waypoint			*m_ConnectWp;
-	int					m_NextUID;
 
 	int					m_GoodPathQueries;
 	int					m_BadPathQueries;
@@ -263,7 +267,6 @@ protected:
 	void cmdWaypointConnect(const StringVector &_args);
 	void cmdWaypointConnectX(const StringVector &_args);
 	void cmdWaypointConnect_Helper(const StringVector &_args, Waypoint *_waypoint);
-	void cmdWaypointConnect_Helper(const StringVector &_args);
 	void cmdWaypointConnect2Way(const StringVector &_args);
 	void cmdWaypointConnect2WayX(const StringVector &_args);
 	void cmdWaypointConnect2Way_Helper(const StringVector &_args, Waypoint *_waypoint);
@@ -344,14 +347,6 @@ protected:
 	enum { MaxEntityConnections = 32 };
 	EntityConnection				EntityConnections[MaxEntityConnections];
 
-	struct Obstacle
-	{
-		GameEntity		Entity;
-		float			Radius;
-	};
-	enum { MaxObstacles = 512 };
-	Obstacle				Obstacles[MaxEntityConnections];
-
 	void _RunDijkstra(const NavFlags _team);
 	void _RunAStar(const NavFlags _team, const Vector3f &_goalPosition);
 
@@ -366,9 +361,6 @@ protected:
 	obuint32 m_GoalIndex;
 	int _MarkWaypointsInRadius(const Vector3f &_pos, const NavFlags _team, int _flags);
 
-	bool _ConnectWaypoints(Waypoint *_wp1, Waypoint *_wp2);
-	bool _DisConnectWaypoints(Waypoint *_wp1, Waypoint *_wp2);
-
 	bool LoadFromFile(const String &_file);
 
 	//bool _LoadVisFromFile(const String &_file);
@@ -379,6 +371,7 @@ protected:
 	int	m_MovingWaypointIndex;
 
 	Vector3f	m_BoxStart;
+	AABB boxselect;
 
 	void UpdateNavRender();
 	void UpdateSelectedWpRender();

@@ -22,7 +22,6 @@
 #include "WeaponDatabase.h"
 #include "FileSystem.h"
 #include "FileDownloader.h"
-#include "ChunkedFile.h"
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -63,21 +62,21 @@ omnibot_error IGameManager::CreateGame(IEngineInterface *_pEngineFuncs, int _ver
 		return BOT_ERROR_WRONGVERSION;
 	}
 
+	if(!FileSystem::InitFileSystem())
+		return BOT_ERROR_FILESYSTEM;
+
 	// Create log file
 	int logSize = m_Game->GetLogSize();
-	if(logSize >= 0)
+	if(logSize > 0)
 	{
-		if(logSize > 0)
-			g_Logger.FileSizeLimit() = (logSize < 2000000) ? logSize * 1024 : 2048000000;
+		if(logSize < 2000000)
+			g_Logger.FileSizeLimit() = logSize * 1024;
 		fs::path logFolder = Utils::GetModFolder() / fs::path("logs");
 		g_Logger.Start(
 			(String)va("%s/omnibot_%s.log", 
 			fs::is_directory(logFolder) ? logFolder.string().c_str() : _pEngineFuncs->GetLogPath(),
 			_pEngineFuncs->GetMapName()), logSize==0);
 	}
-
-	if(!FileSystem::InitFileSystem())
-		return BOT_ERROR_FILESYSTEM;
 
 	FileSystem::SetWriteDirectory(Utils::GetModFolder());
 
@@ -105,13 +104,7 @@ omnibot_error IGameManager::CreateGame(IEngineInterface *_pEngineFuncs, int _ver
 	if(FileSystem::FileDelete("user/logged.gm"))
 		EngineFuncs::ConsoleMessage("deleted user/logged.gm");
 
-	if(!Options::LoadConfigFile("user/omni-bot.cfg"))
-	{
-		if(!Options::LoadConfigFile("config/omni-bot.cfg"))
-		{
-			// error
-		}
-	}
+	Options::LoadConfigFile();
 
 	//////////////////////////////////////////////////////////////////////////
 	// logging options
@@ -150,7 +143,7 @@ omnibot_error IGameManager::CreateGame(IEngineInterface *_pEngineFuncs, int _ver
 	Options::SetValue("Debug","DumpFileDialog",true,false);
 #endif
 
-	Options::SetValue("Script","LiveUpdate",true,false);
+	Options::SetValue("Script","LiveUpdate",false,false);
 	//Options::SetValue("Script","Debug","true",false);
 
 #ifdef ENABLE_REMOTE_DEBUGGER
@@ -323,7 +316,7 @@ void IGameManager::UpdateGame()
 #endif
 	}
 
-	Options::SaveConfigFileIfChanged("user/omni-bot.cfg");
+	Options::SaveConfigFileIfChanged();
 
 #ifdef ENABLE_FILE_DOWNLOADER
 	FileDownloader::Poll();

@@ -294,6 +294,18 @@ void MapGoal::GenerateName(int _instance, bool _skipdupecheck)
 	}
 	boost::replace_all(m_Name, " ", "_");
 
+	//remove invalid characters
+	for(const char *s = m_Name.c_str(); *s; s++)
+	{
+		char c = *s;
+		if(!(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '_'))
+		{
+			static boost::regex re("[^A-Za-z0-9_]");
+			m_Name = boost::regex_replace(m_Name, re, "");
+			break;
+		}
+	}
+
 	//////////////////////////////////////////////////////////////////////////
 	// Dupe name handling, append an instance number
 	if(_instance > 0)
@@ -708,7 +720,7 @@ Matrix3f MapGoal::GetMatrix()
 		Vector3f vFwd, vRight, vUp;
 		bool b = EngineFuncs::EntityOrientation(GetEntity(), vFwd, vRight, vUp);
 		OBASSERT(b,"Lost Entity!");
-		if(b) SetMatrix(Matrix3f(vRight, vFwd, vUp, false));
+		if(b) SetMatrix(Matrix3f(vRight, vFwd, vUp, true));
 	}
 
 	if(!m_OrientationValid){
@@ -999,9 +1011,8 @@ void MapGoal::RenderDebug(bool _editing, bool _highlighted)
 						call.AddParamInt(_highlighted?1:0);
 						if(call.End() == gmThread::EXCEPTION)
 						{
-							/*SetEnable(false, va("Error in Update Callback in Goal: %s", GetName().c_str()));
-							return State_Finished;*/
-						}/**/
+							//SetEnable(false, va("Error in Update Callback in Goal: %s", GetName().c_str()));
+						}
 
 						m_ActiveThread[ON_RENDER] = call.GetThreadId();
 						if(call.DidReturnVariable())
@@ -1139,14 +1150,14 @@ void MapGoal::RenderDefault()
 		if(GetRadius() != 0.f)
 			Utils::DrawRadius(GetPosition(), GetRadius(), COLOR::ORANGE, 2.f);
 		else
-			Utils::DrawLine(GetPosition(), GetPosition() + Vector3f::UNIT_Z * 32.f, COLOR::ORANGE, 2.f);
+			Utils::DrawLine(GetPosition(), GetPosition().AddZ(32), COLOR::ORANGE, 2.f);
 	}
 
 	// use pts
 	for(int i = 0; i < GetNumUsePoints(); ++i)
 	{
 		Vector3f vUsePt = GetWorldUsePoint(i);
-		Utils::DrawLine(vUsePt, vUsePt + Vector3f::UNIT_Z * 32.f, COLOR::GREEN, 2.f);
+		Utils::DrawLine(vUsePt, vUsePt.AddZ(32), COLOR::GREEN, 2.f);
 	}
 
 	if(bf.CheckFlag(DrawDisabled))
@@ -1471,7 +1482,7 @@ void MapGoal::CheckForPersistentProperty()
 //	if(GetRadius() != 0.f)
 //		Utils::DrawRadius(GetPosition(), GetRadius(), _color, _duration);
 //	else
-//		Utils::DrawLine(GetPosition(), GetPosition() + Vector3f::UNIT_Z * 32.f, _color, _duration);
+//		Utils::DrawLine(GetPosition(), GetPosition().AddZ(32), _color, _duration);
 //}
 //
 //void MapGoal::DrawUsePoints(int _color, float _duration)
@@ -1479,7 +1490,7 @@ void MapGoal::CheckForPersistentProperty()
 //	for(int i = 0; i < GetNumUsePoints(); ++i)
 //	{
 //		Vector3f vUsePt = GetWorldUsePoint(i);
-//		Utils::DrawLine(vUsePt, vUsePt + Vector3f::UNIT_Z * 32.f, _color, _duration);
+//		Utils::DrawLine(vUsePt, vUsePt.AddZ(32), _color, _duration);
 //	}
 //}
 void MapGoal::DrawRoute(int _color, float _duration)
@@ -1592,15 +1603,6 @@ void MapGoal::SwapEntities(MapGoal * g1, MapGoal * g2)
 
 bool MapGoal::SaveToTable(gmMachine *_machine, gmGCRoot<gmTableObject> &_savetable, ErrorObj &_err)
 {
-#if 0
-	const char *name = GetName().c_str();
-	for(const char *s = name; *s; s++)
-	{
-		char ch = *s;
-		if(ch=='{' || ch=='}') return false; //tank on ludendorff bridge
-	}
-#endif
-
 	gmGCRoot<gmTableObject> GoalTable(_machine->AllocTableObject(),_machine);
 
 	if(m_SerializeFunc)
@@ -1689,13 +1691,6 @@ bool MapGoal::LoadFromTable(gmMachine *_machine, gmGCRoot<gmTableObject> &_loadt
 
 	_loadtable->CopyTo(_machine,proptable);
 	
-	if(const char *TagName = proptable->Get(_machine,"TagName").GetCStringSafe(0))
-		m_TagName = TagName;
-	else
-	{
-		_err.AddError("Goal.TagName Field Missing!");
-		return false;
-	}
 	if(const char *Name = proptable->Get(_machine,"Name").GetCStringSafe(0))
 		m_Name = Name;
 	else
@@ -1703,8 +1698,19 @@ bool MapGoal::LoadFromTable(gmMachine *_machine, gmGCRoot<gmTableObject> &_loadt
 		_err.AddError("Goal.Name Field Missing!");
 		return false;
 	}
+	const char *TagName = proptable->Get(_machine, "TagName").GetCStringSafe(0);
+	if(!TagName && m_Name.length() > m_GoalType.length()+1)
+		TagName = m_Name.c_str() + m_GoalType.length()+1; //set TagName from Name
+	if(TagName)
+		m_TagName = TagName;
+	else
+	{
+		_err.AddError("Goal.TagName Field Missing!");
+		return false;
+	}
 	m_GroupName = proptable->Get(_machine, "GroupName").GetCStringSafe("");
 	proptable->Get(_machine, "Version").GetInt(m_Version, 0);
+	if(m_Version == 0) proptable->Set(_machine, "Version", gmVariable(m_Version = MapGoalVersion));
 	if(!proptable->Get(_machine, "Position").GetVector(m_Position))
 	{
 		_err.AddError("Goal.Position Field Missing!");
@@ -1766,7 +1772,6 @@ bool MapGoal::LoadFromTable(gmMachine *_machine, gmGCRoot<gmTableObject> &_loadt
 	proptable->Get(_machine, "Range").GetInt(m_Range, 0);
 
 	// clear out the properties we don't want to pass along.
-	//proptable->Set(_machine,"Version",gmVariable::s_null);
 	proptable->Set(_machine,"Name",gmVariable::s_null);
 	proptable->Set(_machine,"TagName",gmVariable::s_null);
 	proptable->Set(_machine,"GroupName",gmVariable::s_null);

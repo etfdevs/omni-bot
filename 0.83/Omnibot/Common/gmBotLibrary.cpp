@@ -411,7 +411,6 @@ static int GM_CDECL gmfMoveBotToAnotherTeam(gmThread *a_thread)
 //		None
 static int GM_CDECL gmfKickAll(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
 	StringVector tl;
 	tl.push_back("kickall");
 	CommandReciever::DispatchCommand(tl);
@@ -530,25 +529,75 @@ static int GM_CDECL gmfGetMapGoal(gmThread *a_thread)
 //
 //		table	- The table to put the matching goals into.
 //		team	- The team the goal should be for. 0 means any team.
-//		exp		- The expression to use to match the goal names. 0 to match any.
+//		exp		- The expression to use to match the goal names. "" to match any.
 //		params
 //
 // Returns:
-//		none
+//		count of returned goals
 static int GM_CDECL gmfGetMapGoals(gmThread *a_thread)
 {
-	GM_CHECK_TABLE_PARAM(table, 0);
-	GM_INT_PARAM(iTeam,1,0);
-	GM_STRING_PARAM(pExpr,2,0);
-	GM_TABLE_PARAM(params,3,0);
+	return GetMapGoals(a_thread, 0);
+}
 
+int GM_CDECL GetMapGoals(gmThread *a_thread, Client *client)
+{
+	GM_CHECK_TABLE_PARAM(table, 0);
 	table->RemoveAndDeleteAll(a_thread->GetMachine());
 
 	GoalManager::Query qry;
-	qry.NoFilters();
-	qry.Expression(pExpr).Team(iTeam);
+	int p = 1;
+	if(client) //QueryGoals
+	{
+		qry.Bot(client);
+		qry.CheckRangeProperty(true);
+	}
+	else //GetGoals
+	{
+		qry.NoFilters();
+		GM_INT_PARAM(iTeam, 1, 0);
+		qry.Team(iTeam);
+		p++;
+	}
+
+	if(GM_NUM_PARAMS > p)
+	{
+		switch(GM_THREAD_ARG->ParamType(p))
+		{
+		case GM_INT:
+			qry.AddType(GM_THREAD_ARG->ParamInt(p));
+			break;
+		case GM_STRING:
+			qry.Expression(GM_THREAD_ARG->ParamString(p));
+			break;
+		case GM_TABLE:
+			{
+				gmTableObject *typesTable = GM_THREAD_ARG->ParamTable(p);
+				if(typesTable->Count() > GoalManager::Query::MaxGoalTypes)
+				{
+					GM_EXCEPTION_MSG("maximum count of goal types in query is %d, got %d", GoalManager::Query::MaxGoalTypes, typesTable->Count());
+					return GM_EXCEPTION;
+				}
+				gmTableIterator tIt;
+				for(gmTableNode *pNode = typesTable->GetFirst(tIt); pNode; pNode = typesTable->GetNext(tIt))
+				{
+					if(pNode->m_value.m_type != GM_INT)
+					{
+						GM_EXCEPTION_MSG("expecting param %d as table of int, got %s", p, GM_THREAD_ARG->GetMachine()->GetTypeName(pNode->m_value.m_type));
+						return GM_EXCEPTION;
+					}
+					qry.AddType(pNode->m_value.GetInt());
+				}
+			}
+			break;
+		default:
+			GM_EXCEPTION_MSG("expecting param %d as string or int or table, got %s", p, GM_THREAD_ARG->ParamTypeName(p));
+			return GM_EXCEPTION;
+		}
+	}
 
 	// parse optional parameters
+	p++;
+	GM_TABLE_PARAM(params, p, 0);
 	if(params)
 	{
 		qry.FromTable(a_thread->GetMachine(),params);
@@ -578,6 +627,7 @@ static int GM_CDECL gmfGetMapGoals(gmThread *a_thread)
 			table->Set(pMachine, i, gmVariable(pUser));
 		}
 	}
+	a_thread->PushInt((gmint)qry.m_List.size());
 	return GM_OK;
 }
 
@@ -596,22 +646,8 @@ static int GM_CDECL gmfSetMapGoalProperties(gmThread *a_thread)
 	GM_CHECK_STRING_PARAM(expr,0);
 	GM_CHECK_TABLE_PARAM(props,1);
 
-	GoalManager::Query qry;
-	qry.NoFilters();
-	qry.Expression(expr);
-	GoalManager::GetInstance()->GetGoals(qry);
-
-	if(!qry.m_List.empty())
-	{
-		for(MapGoalList::iterator it = qry.m_List.begin(); it != qry.m_List.end(); ++it)
-		{
-			(*it)->FromScriptTable(a_thread->GetMachine(),props,false);
-		}
-	}
-	else
-	{
+	if(!GoalManager::GetInstance()->Iterate(expr, [=](MapGoal *g) { g->FromScriptTable(a_thread->GetMachine(),props,false); }))
 		MapDebugPrint(a_thread, va("SetMapGoalProperties: goal query for %s has no results", expr));
-	}
 	return GM_OK;
 }
 
@@ -638,34 +674,12 @@ void MapDebugPrint(const char *message)
 	MapDebugPrint(ScriptManager::GetInstance()->GetMachine(), 0, message);
 }
 
-static int SetAvailableMapGoals(gmThread *a_thread, int _team, bool _available, const char* _expression, int ignoreErrors)
+static int SetAvailableMapGoals(gmThread *a_thread, int team, bool available, const char* expr, int ignoreErrors)
 {
-	GoalManager::Query qry;
-	qry.Expression(_expression);
-	qry.NoFilters();
-	GoalManager::GetInstance()->GetGoals(qry);
-
-	if(!qry.m_List.empty())
-	{
-		for(MapGoalList::iterator it = qry.m_List.begin(); it != qry.m_List.end(); ++it)
-		{
-			if(_team == 0)
-			{
-				for(int t = 1; t <= 4; ++t)
-					(*it)->SetAvailable(t, _available);
-			}
-			else
-			{
-				(*it)->SetAvailable(_team, _available);
-			}
-		}
-	}
-	else if(!ignoreErrors)
-	{
-		MapDebugPrint(a_thread, va("SetAvailableMapGoals: goal query for %s has no results", _expression));
-	}
-
-	return (int)qry.m_List.size();
+	int n = GoalManager::GetInstance()->Iterate(expr, [=](MapGoal *g) { g->SetAvailable(team,  available); });
+	if(n==0 && !ignoreErrors)
+		MapDebugPrint(a_thread, va("SetAvailableMapGoals: goal query for %s has no results", expr));
+	return n;
 }
 
 // function: SetAvailableMapGoals
@@ -740,27 +754,10 @@ static int GM_CDECL gmfSetGoalPriorityForTeamClass(gmThread *a_thread)
 	GM_INT_PARAM(classId,3,0);
 	GM_INT_PARAM(persis,4,0);
 	
-	GoalManager::Query qry;
-	qry.Expression(exp);
-	qry.NoFilters();
-	GoalManager::GetInstance()->GetGoals(qry);
-
-	if(!qry.m_List.empty())
-	{
-		for(MapGoalList::iterator it = qry.m_List.begin(); it != qry.m_List.end(); ++it)
-		{
-			(*it)->SetPriorityForClass(teamId, classId, priority);
-		}
-	}
-	else if(!persis)
-	{
+	if(!GoalManager::GetInstance()->Iterate(exp, [=](MapGoal *g) { g->SetPriorityForClass(teamId, classId, priority); }) && !persis)
 		MapDebugPrint(a_thread, va("SetGoalPriority: goal query for %s has no results", exp));
-	}
 
-	if(persis)
-	{
-		MapGoal::SetPersistentPriorityForClass(exp,teamId,classId,priority);
-	}
+	if(persis) MapGoal::SetPersistentPriorityForClass(exp,teamId,classId,priority);
 	return GM_OK;
 }
 
@@ -802,23 +799,11 @@ static int GM_CDECL SetOrClearGoalRole(gmThread *a_thread, bool enable)
 	}
 	BitFlag32 role(roleInt);
 
-	GoalManager::Query qry;
-	qry.Expression(exp);
-	qry.NoFilters();
-	GoalManager::GetInstance()->GetGoals(qry);
-
-	if(!qry.m_List.empty())
-	{
-		for(MapGoalList::iterator it = qry.m_List.begin(); it != qry.m_List.end(); ++it)
-		{
-			BitFlag32 oldRole = (*it)->GetRoleMask();
-			(*it)->SetRoleMask(enable ? (oldRole | role) : (oldRole & ~role));
-		}
-	}
-	else if(!persis)
-	{
+	if(!GoalManager::GetInstance()->Iterate(exp, [=](MapGoal *g){ 
+			BitFlag32 oldRole = g->GetRoleMask();
+			g->SetRoleMask(enable ? (oldRole | role) : (oldRole & ~role));
+		}) && !persis)
 		MapDebugPrint(a_thread, va("%s: goal query for %s has no results", enable ? "SetGoalRole" : "ClearGoalRole", exp));
-	}
 
 	if(persis) MapGoal::SetPersistentRole(exp, role);
 	return GM_OK;
@@ -893,14 +878,7 @@ static int GM_CDECL gmfSetGoalGroup(gmThread *a_thread)
 	else if(a_thread->ParamType(0)==GM_STRING)
 	{
 		GM_STRING_PARAM(exp,0,0);
-		GoalManager::Query qry;
-		qry.Expression(exp);
-		qry.NoFilters();
-		GoalManager::GetInstance()->GetGoals(qry);
-		for(obuint32 i = 0; i < qry.m_List.size(); ++i)
-		{
-			qry.m_List[i]->SetGroupName(group);
-		}
+		GoalManager::GetInstance()->Iterate(exp, [=](MapGoal *g){ g->SetGroupName(group); });
 	}
 	else
 	{
@@ -1056,7 +1034,7 @@ static int gmfGroundPoint(gmThread *a_thread)
 	Vector3f vPt(pt.x,pt.y,pt.z);
 
 	obTraceResult tr;
-	EngineFuncs::TraceLine(tr,vPt,vPt+Vector3f(0,0,-1024.f),NULL,iMask,-1,False);
+	EngineFuncs::TraceLine(tr,vPt,vPt.AddZ(-1024.f),NULL,iMask,-1,False);
 	if(tr.m_Fraction<1.f)
 		vPt = tr.m_Endpos;
 
@@ -1301,8 +1279,6 @@ static int gmfDrawTrajectory(gmThread *a_thread)
 //		null - If no map is loaded, or there was an error.
 static int GM_CDECL gmfGetMapName(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
-
 	const char *pMapName = g_EngineFuncs->GetMapName();
 	if(pMapName)
 	{
@@ -1329,7 +1305,6 @@ static int GM_CDECL gmfGetMapName(gmThread *a_thread)
 //		<gmAABB> - Axis aligned box for the map extents.
 static int GM_CDECL gmfGetMapExtents(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
 	GM_GMBIND_PARAM(AABB*, gmAABB, aabb, 0, NULL);
 	AABB mapaabb;
 	g_EngineFuncs->GetMapExtents(mapaabb);
@@ -1373,7 +1348,6 @@ static int GM_CDECL gmfGetPointContents(gmThread *a_thread)
 //		int - The current time, in milliseconds (1000ms = 1 second)
 static int GM_CDECL gmfGetTime(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushFloat(IGame::GetTimeSecs());
 	return GM_OK;
 }
@@ -2436,7 +2410,6 @@ static int gmfCheckEntityBoundsIntersect(gmThread *a_thread)
 //		string - current game state
 static int GM_CDECL gmfGetGameState(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushNewString(InterfaceFuncs::GetGameState(InterfaceFuncs::GetGameState()));
 	return GM_OK;
 }
@@ -2452,7 +2425,6 @@ static int GM_CDECL gmfGetGameState(gmThread *a_thread)
 //		float - seconds left in game
 static int GM_CDECL gmfGetGameTimeLeft(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushFloat(InterfaceFuncs::GetGameTimeLeft());
 	return GM_OK;
 }
@@ -2495,7 +2467,6 @@ static int GM_CDECL gmfExecCommandOnClient(gmThread *a_thread)
 //		<string> - Name of current game.
 static int GM_CDECL gmfGetGameName(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushNewString(g_EngineFuncs->GetGameName());
 	return GM_OK;
 }
@@ -2510,7 +2481,6 @@ static int GM_CDECL gmfGetGameName(gmThread *a_thread)
 //		<string> - Name of current mod.
 static int GM_CDECL gmfGetModName(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushNewString(g_EngineFuncs->GetModName());
 	return GM_OK;
 }
@@ -2525,7 +2495,6 @@ static int GM_CDECL gmfGetModName(gmThread *a_thread)
 //		<string> - Version of current mod.
 static int GM_CDECL gmfGetModVersion(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushNewString(g_EngineFuncs->GetModVers());
 	return GM_OK;
 }
@@ -2538,8 +2507,6 @@ static int GM_CDECL gmfGetModVersion(gmThread *a_thread)
 //
 static int GM_CDECL gmfShowPaths(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
-
 	IGame *pGame = IGameManager::GetInstance()->GetGame();
 	if(pGame)
 	{
@@ -2561,7 +2528,6 @@ static int GM_CDECL gmfShowPaths(gmThread *a_thread)
 //		<float> - Current Gravity.
 static int GM_CDECL gmfGetGravity(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushFloat(IGame::GetGravity());
 	return GM_OK;
 }
@@ -2576,7 +2542,6 @@ static int GM_CDECL gmfGetGravity(gmThread *a_thread)
 //		<int> - true if cheats enabled, false if not.
 static int GM_CDECL gmfGetCheats(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushInt(IGame::GetCheatsEnabled());
 	return GM_OK;
 }
@@ -2611,7 +2576,6 @@ static int GM_CDECL gmfServerScriptFunction(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalEntity(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	if(Utils::GetLocalEntity().IsValid())
 		a_thread->PushEntity(Utils::GetLocalEntity().AsInt());
 	else
@@ -2621,7 +2585,6 @@ static int GM_CDECL gmfGetLocalEntity(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalPosition(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	Vector3f v;
 	if(Utils::GetLocalPosition(v))
 		a_thread->PushVector(v);
@@ -2632,7 +2595,6 @@ static int GM_CDECL gmfGetLocalPosition(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalGroundPosition(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	Vector3f v;
 	if(Utils::GetLocalGroundPosition(v, TR_MASK_FLOODFILL))
 		a_thread->PushVector(v);
@@ -2643,7 +2605,6 @@ static int GM_CDECL gmfGetLocalGroundPosition(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalEyePosition(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	Vector3f v;
 	if(Utils::GetLocalEyePosition(v))
 		a_thread->PushVector(v);
@@ -2654,7 +2615,6 @@ static int GM_CDECL gmfGetLocalEyePosition(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalFacing(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	Vector3f v;
 	if(Utils::GetLocalFacing(v))
 		a_thread->PushVector(v);
@@ -2665,7 +2625,6 @@ static int GM_CDECL gmfGetLocalFacing(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalAABB(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	AABB aabb;
 	if(Utils::GetLocalAABB(aabb))
 		gmAABB::PushObject(a_thread, aabb);
@@ -2676,7 +2635,6 @@ static int GM_CDECL gmfGetLocalAABB(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalAimPosition(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	GM_INT_PARAM(mask,0,TR_MASK_FLOODFILL);
 	Vector3f v, n;
 	if(Utils::GetLocalAimPoint(v,&n,mask))
@@ -2688,7 +2646,6 @@ static int GM_CDECL gmfGetLocalAimPosition(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalAimNormal(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	GM_INT_PARAM(mask,0,TR_MASK_FLOODFILL);
 	Vector3f v, n;
 	if(Utils::GetLocalAimPoint(v,&n,mask))
@@ -2714,7 +2671,6 @@ static int GM_CDECL gmfGetNearestNonSolid(gmThread *a_thread)
 
 static int GM_CDECL gmfGetLocalCommand(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);
 	if(CommandReciever::m_ConsoleCommandThreadId == a_thread->GetId() 
 		|| CommandReciever::m_MapDebugPrintThreadId == a_thread->GetId())
 		a_thread->PushNewString(CommandReciever::m_ConsoleCommand.c_str());
@@ -2725,14 +2681,12 @@ static int GM_CDECL gmfGetLocalCommand(gmThread *a_thread)
 
 static int GM_CDECL gmfReloadGoalScripts(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	IGameManager::GetInstance()->GetGame()->ReloadGoalScripts();
 	return GM_OK;
 }
 
 static int GM_CDECL gmfAllocGoalSerialNum(gmThread *a_thread)
 {	
-	GM_CHECK_NUM_PARAMS(0);
 	a_thread->PushInt(GetMapGoalSerial());
 	return GM_OK;
 }

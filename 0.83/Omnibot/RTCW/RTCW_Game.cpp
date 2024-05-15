@@ -430,6 +430,13 @@ void RTCW_Game::RegisterNavigationFlags(PathPlannerBase *_planner)
 	_planner->RegisterNavFlag("STRAFE_JUMP_R",	F_RTCW_NAV_STRAFE_JUMP_R);
 }
 
+NavFlags RTCW_Game::DeprecatedNavigationFlags() const
+{
+	return IGame::DeprecatedNavigationFlags() | F_NAV_TEAM3 | F_NAV_TEAM4
+		| F_RTCW_NAV_CAPPOINT | F_RTCW_NAV_ARTSPOT | F_RTCW_NAV_ARTYTARGET_S | F_RTCW_NAV_ARTYTARGET_D
+		| F_RTCW_NAV_FLAMETHROWER | F_RTCW_NAV_PANZER | F_RTCW_NAV_VENOM | F_RTCW_NAV_USERGOAL;
+}
+
 void RTCW_Game::InitCommands()
 {
 	IGame::InitCommands();
@@ -553,8 +560,8 @@ PathPlannerWaypoint::BlockableStatus RTCW_PathCheck(const Waypoint* _wp1, const 
 		static float fOffset = 25.0f;
 		static Vector3f vMins(-5.f, -5.f, -5.f), vMaxs(5.f, 5.f, 5.f);
 		AABB aabb(vMins, vMaxs);
-		vStart = _wp1->GetPosition() + Vector3f(0, 0, fOffset);
-		vEnd = _wp2->GetPosition() + Vector3f(0, 0, fOffset);
+		vStart = _wp1->GetPosition().AddZ(fOffset);
+		vEnd = _wp2->GetPosition().AddZ(fOffset);
 		
 		if(bRender)
 		{
@@ -569,7 +576,7 @@ PathPlannerWaypoint::BlockableStatus RTCW_PathCheck(const Waypoint* _wp1, const 
 	if(res != PathPlannerWaypoint::B_PATH_CLOSED && _wp1->IsFlagOn(F_RTCW_NAV_BRIDGE) && _wp2->IsFlagOn(F_RTCW_NAV_BRIDGE))
 	{
 		vStart = _wp1->GetPosition() + (_wp2->GetPosition() - _wp1->GetPosition()) * 0.5;
-		vEnd = vStart +  Vector3f(0,0,-48);
+		vEnd = vStart.AddZ(-48);
 
 		if(bRender)
 		{

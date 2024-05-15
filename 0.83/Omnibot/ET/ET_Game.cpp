@@ -592,6 +592,13 @@ void ET_Game::RegisterNavigationFlags(PathPlannerBase *_planner)
 	_planner->RegisterNavFlag("USEPATH",		F_ET_NAV_USEPATH);
 }
 
+NavFlags ET_Game::DeprecatedNavigationFlags() const
+{
+	return IGame::DeprecatedNavigationFlags() | F_NAV_TEAM3 | F_NAV_TEAM4 | F_ET_NAV_MG42SPOT | F_ET_NAV_MORTAR 
+		| F_ET_NAV_MINEAREA | F_ET_NAV_CAPPOINT | F_ET_NAV_ARTSPOT | F_ET_NAV_ARTYTARGET_S | F_ET_NAV_ARTYTARGET_D 
+		| F_ET_NAV_FLAMETHROWER | F_ET_NAV_PANZER | F_ET_NAV_USERGOAL;
+}
+
 void ET_Game::InitCommands()
 {
 	IGame::InitCommands();
@@ -743,8 +750,8 @@ PathPlannerWaypoint::BlockableStatus ET_PathCheck(const Waypoint* _wp1, const Wa
 		static float fOffset = 25.0f;
 		static Vector3f vMins(-5.f, -5.f, -5.f), vMaxs(5.f, 5.f, 5.f);
 		AABB aabb(vMins, vMaxs);
-		vStart = _wp1->GetPosition() + Vector3f(0, 0, fOffset);
-		vEnd = _wp2->GetPosition() + Vector3f(0, 0, fOffset);
+		vStart = _wp1->GetPosition().AddZ(fOffset);
+		vEnd = _wp2->GetPosition().AddZ(fOffset);
 		
 		if(bRender)
 		{
@@ -759,7 +766,7 @@ PathPlannerWaypoint::BlockableStatus ET_PathCheck(const Waypoint* _wp1, const Wa
 	if(res != PathPlannerWaypoint::B_PATH_CLOSED && _wp1->IsFlagOn(F_ET_NAV_BRIDGE) && _wp2->IsFlagOn(F_ET_NAV_BRIDGE))
 	{
 		vStart = _wp1->GetPosition() + (_wp2->GetPosition() - _wp1->GetPosition()) * 0.5;
-		vEnd = vStart +  Vector3f(0,0,-48);
+		vEnd = vStart.AddZ(-48);
 
 		if(bRender)
 		{

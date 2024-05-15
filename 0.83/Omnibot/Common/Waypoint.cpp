@@ -168,8 +168,7 @@ void Waypoint::Sync( RemoteLib::DataBuffer & db, bool fullSync ) {
 
 Segment3f Waypoint::GetSegment()
 {
-	Vector3f vWpBottom = GetPosition() + Vector3f(0,0,g_fBottomWaypointOffset);
-	return Segment3f(vWpBottom, Vector3f::UNIT_Z, g_fTopWaypointOffset-g_fBottomWaypointOffset);
+	return Segment3f(GetPosition().AddZ(g_fBottomWaypointOffset), Vector3f::UNIT_Z, g_fTopWaypointOffset-g_fBottomWaypointOffset);
 }
 
 void Waypoint::AssignNewUID()
@@ -195,7 +194,7 @@ bool Waypoint::IsConnectedTo(const Waypoint *_wp) const
 
 bool Waypoint::ConnectTo(Waypoint *_wp, obuint32 _flags)
 {
-	if(_wp && !IsConnectedTo(_wp))
+	if(_wp && _wp != this && !IsConnectedTo(_wp))
 	{
 		Waypoint::ConnectionInfo info;
 		info.m_Connection = _wp;

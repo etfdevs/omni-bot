@@ -40,11 +40,10 @@ SOURCES = [ glob ../dependencies/gmscriptex/gmsrc_ex/src/gm/*.cpp ]
 		  [ glob ../dependencies/pcre-8.10/*.c ] 
 		  [ glob ../dependencies/pcre-8.10/*.cpp ] 		  
 #		  [ glob ../dependencies/sqlite3/*.c ]
-		  [ glob ObstacleManager.cpp ]
 #		  [ glob RecastInterfaces.cpp ]
 		  [ glob BatchBuild.cpp ] 
 		;
 
 lib Common : $(SOURCES) 
-		 : <link>static <toolset>gcc:<cflags>-w <cflags>-pthread <cflags>-DPHYSFS_SUPPORTS_ZIP=1 <cflags>-DPHYSFS_SUPPORTS_7Z=1 <cflags>-DPHYSFS_NO_CDROM_SUPPORT <cflags>-fno-strict-aliasing
+		 : <link>static <toolset>gcc:<cflags>-w <cflags>-pthread <cflags>-DPHYSFS_SUPPORTS_ZIP=1 <cflags>-DPHYSFS_SUPPORTS_7Z=1 <cflags>-DPHYSFS_NO_CDROM_SUPPORT <cflags>-fno-strict-aliasing <cflags>-std=c++11
 		 ;

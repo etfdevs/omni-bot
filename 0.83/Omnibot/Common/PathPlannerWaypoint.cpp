@@ -28,6 +28,7 @@
 #include "WaypointSerializer_V5.h"
 #include "WaypointSerializer_V6.h"
 #include "WaypointSerializer_V7.h"
+#include "WaypointSerializer_V9.h"
 // TODO: next wp version, remove F_NAV_TEAMONLY 
 
 using namespace std;
@@ -83,7 +84,6 @@ PathPlannerWaypoint::PathPlannerWaypoint()
 	, m_DefaultWaypointRadius	(35.0f)
 	, m_SelectedWaypoint		(-1)
 	, m_ConnectWp				(0)
-	, m_NextUID					(0)
 	, m_GoodPathQueries			(0)
 	, m_BadPathQueries			(0)
 	, m_PathCheckCallback		(0)
@@ -100,6 +100,7 @@ PathPlannerWaypoint::PathPlannerWaypoint()
 	m_WaypointSerializer[6] = WpSerializerPtr(new WaypointSerializer_V6);
 	m_WaypointSerializer[7] = WpSerializerPtr(new WaypointSerializer_V7);
 	m_WaypointSerializer[8] = m_WaypointSerializer[7]; // same format, diff version for 0.7
+	m_WaypointSerializer[9] = WpSerializerPtr(new WaypointSerializer_V9);
 
 	LOG("Waypoint Nav System Initialized (" << m_WaypointSerializer.size() << " Serializers)");
 
@@ -175,7 +176,7 @@ void PathPlannerWaypoint::UpdateSelectedWpRender()
 			if(!flagString.empty())
 			{
 				Utils::PrintText(
-					pWaypoint->GetPosition() + Vector3f::UNIT_Z * g_fWaypointTextOffset,
+					pWaypoint->GetPosition().AddZ(g_fWaypointTextOffset),
 					COLOR::WHITE,
 					g_fWaypointTextDuration,
 					flagString.c_str());
@@ -189,13 +190,7 @@ void PathPlannerWaypoint::UpdateNavRender()
 	Prof(UpdateNavRender);
 
 	GameEntity ge = Utils::GetLocalEntity();
-	if(!ge.IsValid())
-		return; 
-
-	float fWaypointDuration = 2.f;
-
-	static int iNextStart = 0;
-	static int i = 0;
+	if(!ge.IsValid()) return; 
 
 	if(!m_CreatingSector.m_SectorBounds.IsZero())
 	{
@@ -209,10 +204,6 @@ void PathPlannerWaypoint::UpdateNavRender()
 			localaabb.Translate(vAimPos);
 			localaabb.m_Mins[2] += 4.f;
 			localaabb.CenterPoint(vTmp);
-
-			AABB boxselect(vAimPos);
-			boxselect.m_Mins[2] = -4096.f;
-			boxselect.m_Maxs[2] = 4096.f;
 
 			Vector3f axis[] =
 			{
@@ -276,19 +267,21 @@ void PathPlannerWaypoint::UpdateNavRender()
 	}
 	//////////////////////////////////////////////////////////////////////////
 	// Render box selection
-	AABB boxselect(Vector3f::ZERO);
 	if(m_BoxStart != Vector3f::ZERO)
 	{
 		Vector3f vAimPos;
 		if(Utils::GetLocalAimPoint(vAimPos))
 		{
-			AABB aabb(m_BoxStart, vAimPos);
-			Utils::OutlineAABB(aabb, COLOR::MAGENTA, IGame::GetDeltaTimeSecs()*2.f,AABB::DIR_BOTTOM);
+			boxselect.Set(m_BoxStart, vAimPos);
+			Utils::OutlineAABB(boxselect, COLOR::MAGENTA, IGame::GetDeltaTimeSecs() * 2.f, AABB::DIR_BOTTOM);
 
-			boxselect = aabb;
 			boxselect.m_Mins[2] = -4096.f;
 			boxselect.m_Maxs[2] = 4096.f;
 		}
+	}
+	else
+	{
+		boxselect.Set(Vector3f::ZERO);
 	}
 	//////////////////////////////////////////////////////////////////////////
 
@@ -299,98 +292,6 @@ void PathPlannerWaypoint::UpdateNavRender()
 	}
 
 	//////////////////////////////////////////////////////////////////////////
-	Vector3f vPosition, vFacing;
-	g_EngineFuncs->GetEntityEyePosition(ge, vPosition);
-	g_EngineFuncs->GetEntityOrientation(ge, vFacing, 0, 0);
-
-	Timer tme;
-
-	int iNumWps = (int)m_WaypointList.size();
-	//for(int i = 0; i < iNumWps; ++i)
-	while(iNumWps)
-	{
-		i %= iNumWps;
-
-		if(i==0)
-		{
-			if(iNextStart > IGame::GetTime())
-				break;
-			iNextStart = IGame::GetTime() + Utils::SecondsToMilliseconds(fWaypointDuration);
-			//UpdateSelectedWpRender();
-		}
-
-		Waypoint *pWp = m_WaypointList[i];
-
-		obColor wpColor = g_WaypointColor;
-		if(pWp->IsFlagOn(F_NAV_TEAM1))
-			wpColor = g_Team1;
-		else if(pWp->IsFlagOn(F_NAV_TEAM2))
-			wpColor = g_Team2;
-		else if(pWp->IsFlagOn(F_NAV_TEAM3))
-			wpColor = g_Team3;
-		else if(pWp->IsFlagOn(F_NAV_TEAM4))
-			wpColor = g_Team4;
-
-		// Is it selected?
-		if(std::find(m_SelectedWaypoints.begin(), m_SelectedWaypoints.end(), pWp) != m_SelectedWaypoints.end())
-			wpColor = g_SelectedWaypoint;
-
-		if(!boxselect.IsZero() && boxselect.Contains(pWp->GetPosition()))
-			wpColor = g_SelectedWaypoint;
-
-		//g_EngineFuncs->AddDisplayLine(LINE_WAYPOINT, pWp->GetPosition(), pWp->GetPosition(), wpColor);
-		if(Utils::InFieldOfView(vFacing, pWp->GetPosition()-vPosition, 120.0f))
-		{
-			Utils::DrawLine(
-				pWp->GetPosition() + Vector3f(0.f, 0.f, g_fTopWaypointOffset),
-				pWp->GetPosition() + Vector3f(0.f, 0.f, g_fBottomWaypointOffset),
-				wpColor,
-				fWaypointDuration);
-
-			if(m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) && 
-				pWp->GetFacing() != Vector3f::ZERO)
-			{
-				Vector3f vStart = pWp->GetPosition() + Vector3f(0.f, 0.f, g_fFacingOffset);
-				Utils::DrawLine(
-					vStart,
-					vStart + pWp->GetFacing() * 32.f,
-					g_ShowFacingColor,
-					fWaypointDuration);
-			}
-		}
-
-		// Add the paths
-		Waypoint::ConnectionList::iterator it = pWp->m_Connections.begin();
-		while(it != pWp->m_Connections.end())
-		{
-			obColor pathColor = it->m_Connection->IsConnectedTo(pWp) ? g_LinkColor2Way : g_LinkColor1Way;
-
-			if(it->CheckFlag(F_LNK_CLOSED))
-				pathColor = g_LinkClosedColor;
-			else if(it->CheckFlag(F_LNK_TELEPORT))
-				pathColor = g_LinkTeleport;
-			
-			//////////////////////////////////////////////////////////////////////////
-			Vector3f vP1 = pWp->GetPosition() + Vector3f(0.f, 0.f, g_fTopPathOffset);
-			Vector3f vP2 = it->m_Connection->GetPosition() + Vector3f(0.f, 0.f, g_fBottomPathOffset);
-			if(Utils::InFieldOfView(vFacing, vP1-vPosition, 120.0f) ||
-				Utils::InFieldOfView(vFacing, vP2-vPosition, 120.0f))
-			{
-				Utils::DrawLine(
-					vP1,
-					vP2,
-					pathColor,
-					fWaypointDuration);
-			}
-			//////////////////////////////////////////////////////////////////////////
-
-			++it;
-		}
-
-		++i;
-		if(tme.GetElapsedSeconds() > 0.02)
-			break;
-	}
 
 	// render entity connections.
 	for(int i = 0; i < MaxEntityConnections; ++i)
@@ -450,12 +351,95 @@ void PathPlannerWaypoint::UpdateNavRender()
 	}
 }
 
+void PathPlannerWaypoint::DrawActiveFrame()
+{
+	Prof(DrawActiveFrame);
+
+	GameEntity ge = Utils::GetLocalEntity();
+	if(!ge.IsValid()) return;
+	Vector3f vPosition, vFacing;
+	g_EngineFuncs->GetEntityEyePosition(ge, vPosition);
+	g_EngineFuncs->GetEntityOrientation(ge, vFacing, 0, 0);
+
+	for(WaypointList::const_iterator itW = m_WaypointList.begin(); itW != m_WaypointList.end(); itW++)
+	{
+		Waypoint *pWp = *itW;
+		Vector3f vP1 = pWp->GetPosition().AddZ(g_fTopPathOffset);
+
+		bool inFOV = Utils::InFieldOfView120(vFacing, vP1 - vPosition);
+		if(inFOV)
+		{
+			obColor color = g_WaypointColor;
+			if(pWp->IsFlagOn(F_NAV_TEAM1))
+				color = g_Team1;
+			else if(pWp->IsFlagOn(F_NAV_TEAM2))
+				color = g_Team2;
+			else if(pWp->IsFlagOn(F_NAV_TEAM3))
+				color = g_Team3;
+			else if(pWp->IsFlagOn(F_NAV_TEAM4))
+				color = g_Team4;
+
+			// Is it selected?
+			if(std::find(m_SelectedWaypoints.begin(), m_SelectedWaypoints.end(), pWp) != m_SelectedWaypoints.end()
+			  || boxselect.Contains(pWp->GetPosition()))
+				color = g_SelectedWaypoint;
+
+			g_ClientFuncs->DrawLine(
+			  pWp->GetPosition().AddZ(g_fTopWaypointOffset),
+			  pWp->GetPosition().AddZ(g_fBottomWaypointOffset),
+			  color);
+
+			if(m_PlannerFlags.CheckFlag(WAYPOINT_VIEW_FACING) && pWp->GetFacing() != Vector3f::ZERO)
+			{
+				Vector3f vStart = pWp->GetPosition().AddZ(g_fFacingOffset);
+				g_ClientFuncs->DrawLine(
+				  vStart,
+				  vStart + pWp->GetFacing() * 32.f,
+				  g_ShowFacingColor);
+			}
+		}
+
+		// Add the paths
+		for(Waypoint::ConnectionList::iterator it = pWp->m_Connections.begin(); it != pWp->m_Connections.end(); it++)
+		{
+			Vector3f vP2 = it->m_Connection->GetPosition().AddZ(g_fBottomPathOffset);
+			if(inFOV || Utils::InFieldOfView120(vFacing, vP2 - vPosition))
+			{
+				obColor color = it->m_Connection->IsConnectedTo(pWp) ? g_LinkColor2Way : g_LinkColor1Way;
+				if(it->CheckFlag(F_LNK_CLOSED))
+					color = g_LinkClosedColor;
+				else if(it->CheckFlag(F_LNK_TELEPORT))
+					color = g_LinkTeleport;
+
+				g_ClientFuncs->DrawLine(vP1, vP2, color);
+			}
+		}
+	}
+}
+
+int PathPlannerWaypoint::CheckBlockable()
+{
+	int count = 0;
+	if (m_PathCheckCallback) 
+	{
+		ConnectionList::iterator it = m_BlockableList.begin(), itEnd = m_BlockableList.end();
+		for (; it != itEnd; ++it)
+		{
+			if ((*it).second->m_ConnectionFlags & F_LNK_CLOSED)
+				if (m_PathCheckCallback((*it).first, (*it).second->m_Connection, false) == B_PATH_OPEN) {
+					(*it).second->m_ConnectionFlags &= ~F_LNK_CLOSED;
+					count++;
+				}
+		}
+	}
+	return count;
+}
+
 void PathPlannerWaypoint::Update()
 {
 	Prof(PathPlannerWaypoint);
 
-	if(m_PlannerFlags.CheckFlag(NAV_VIEW))
-		UpdateNavRender();
+	if(IsViewOn()) UpdateNavRender();
 
 	// TODO: run any time spliced paths.
 	if(m_BlockableRegulator->IsReady() && m_PathCheckCallback)
@@ -494,11 +478,11 @@ void PathPlannerWaypoint::Update()
 			}
 
 			// Show some feedback			
-			if(m_PlannerFlags.CheckFlag(NAV_VIEW))
+			if(IsViewOn())
 			{
 				Utils::DrawLine(
-					(*it).first->GetPosition() + Vector3f(0.f, 0.f, g_fBlockablePathOffset),
-					(*it).second->m_Connection->GetPosition() + Vector3f(0.f, 0.f, g_fBlockablePathOffset),
+					(*it).first->GetPosition().AddZ(g_fBlockablePathOffset),
+					(*it).second->m_Connection->GetPosition().AddZ(g_fBlockablePathOffset),
 					((*it).second->m_ConnectionFlags & F_LNK_CLOSED) ? g_BlockableBlocked : g_BlockableOpen,
 					(float)m_BlockableRegulator->GetInterval() / 1000.f);
 			}
@@ -513,7 +497,7 @@ void PathPlannerWaypoint::Update()
 		}
 	}
 
-	if(m_PlannerFlags.CheckFlag(NAV_VIEW))
+	if(IsViewOn())
 	{
 		RenderFailedPaths();
 
@@ -634,6 +618,16 @@ Waypoint *PathPlannerWaypoint::GetWaypointByName(const String &_name) const
 			return (*cIt);
 	}
 	return 0;
+}
+
+void PathPlannerWaypoint::GetWaypointsByName(const String &_name, WaypointList &_list) const
+{
+	WaypointList::const_iterator cIt = m_WaypointList.begin(), cItEnd = m_WaypointList.end();
+	for (; cIt != cItEnd; ++cIt)
+	{
+		if ((*cIt)->GetName() == _name)
+			_list.push_back(*cIt);
+	}
 }
 
 void PathPlannerWaypoint::GetWaypointsByExpr(const String &_expr, WaypointList &_list) const
@@ -820,7 +814,7 @@ void PathPlannerWaypoint::_RunDijkstra(const NavFlags _team)
 				&& (!pNextWp->IsFlagOn(F_NAV_INFILTRATOR) || !m_Client || !m_Client->IsInfiltrator()))
 				continue;
 
-			// TODO: take flags into account.
+			// take flags into account.
 			if(pNextWp->IsFlagOn(F_NAV_CLOSED) || (it->m_ConnectionFlags & F_LNK_CLOSED))
 				continue;
 
@@ -833,8 +827,14 @@ void PathPlannerWaypoint::_RunDijkstra(const NavFlags _team)
 			// Calculate the successor cost.
 			// Ignore distance to next node if this is flagged as a teleporter.
 			float fSuccesorCost = pCurrentNode->m_FinalCost;
-			if(!(it->m_ConnectionFlags & F_LNK_TELEPORT))
-				fSuccesorCost += (pCurrentNode->GetPosition() - pNextWp->GetPosition()).Length();
+			if (!(it->m_ConnectionFlags & F_LNK_TELEPORT))
+			{
+				float len = (pCurrentNode->GetPosition() - pNextWp->GetPosition()).Length();
+				if (pNextWp->IsFlagOn(F_NAV_PRONE)) len *= 3.8f;
+				else if (pNextWp->IsFlagOn(F_NAV_CROUCH)) len *= 3.2f;
+				else if (pNextWp->IsFlagOn(F_NAV_SNEAK)) len *= 2.0f;
+				fSuccesorCost += len;
+			}
 
 			if(pNextWp->m_PathSerial == serial)
 			{
@@ -1212,6 +1212,19 @@ bool PathPlannerWaypoint::Load(const String &_mapname, bool _dl)
 	return false;
 }
 
+void PathPlannerWaypoint::SetNavDir(String &navDir, const char *_file)
+{
+	const char* dir = PHYSFS_getRealDir(_file);
+	if (dir) {
+		const char* nav = strstr(dir, "incomplete_navs");
+		if(nav)
+		{
+			navDir = nav;
+			if(navDir.size() > 15 && navDir[15] == '\\') navDir[15] = '/';
+		}
+	}
+}
+
 bool PathPlannerWaypoint::LoadFromFile(const String &_file)
 {
 	Unload();
@@ -1224,18 +1237,11 @@ bool PathPlannerWaypoint::LoadFromFile(const String &_file)
 	if(!InFile.IsOpen())
 		return false;
 
-	const char* dir = PHYSFS_getRealDir(_file.c_str());
-	if (dir) {
-		const char* nav = strstr(dir, "incomplete_navs");
-		if (nav) m_NavDir = nav;
-	}
+	SetNavDir(m_NavDir, _file.c_str());
 
 	// Read the waypoint header.
 	memset(&m_WaypointHeader, 0, sizeof(m_WaypointHeader));
 	InFile.Read(&m_WaypointHeader, sizeof(m_WaypointHeader));
-
-	// ZERO THE COMMENTS
-	memset(&m_WaypointHeader.m_Comments, 0, sizeof(m_WaypointHeader.m_Comments));
 
 	WaypointSerializers::iterator it = m_WaypointSerializer.find(m_WaypointHeader.m_WaypointVersion);
 	if(it != m_WaypointSerializer.end())
@@ -1556,24 +1562,10 @@ PathPlannerWaypoint::ClosestLink PathPlannerWaypoint::_GetClosestLink(const Vect
 
 bool PathPlannerWaypoint::_ConnectWaypoints(Waypoint *_wp1, Waypoint *_wp2)
 {
-	if((_wp1 && _wp2) && (_wp1 != _wp2))
+	if(_wp1 && _wp1->ConnectTo(_wp2))
 	{
-		Waypoint::ConnectionList::iterator it = _wp1->m_Connections.begin();
-		for( ; it != _wp1->m_Connections.end(); ++it)
-		{
-			if(it->m_Connection == _wp2)
-				return false;
-		}
-
-		Waypoint::ConnectionInfo info;
-		info.m_Connection = _wp2;
-		info.m_ConnectionFlags = 0;
-		_wp1->m_Connections.push_back(info);
-
 		if(_wp1->IsAnyFlagOn(m_BlockableMask) && _wp2->IsAnyFlagOn(m_BlockableMask))
-		{
 			m_BlockableList.push_back(std::make_pair(_wp1, &_wp1->m_Connections.back()));
-		}
 		return true;
 	}
 	return false;
@@ -1872,13 +1864,8 @@ Vector3f PathPlannerWaypoint::GetRandomDestination(Client *_client, const Vector
 	if(!reachableWps.empty())
 	{
 		int ix = rand() % (int)reachableWps.size();
-		Waypoint *pWp = reachableWps[ix];
-
-		const float fWpHeight = g_fTopWaypointOffset-g_fBottomWaypointOffset;
-		const float fWpHalfHeight = fWpHeight * g_fPathLevelOffset;
-
-		dest = pWp->GetPosition();
-		dest.z += g_fBottomWaypointOffset + fWpHalfHeight;
+		const float offset = g_fBottomWaypointOffset + (g_fTopWaypointOffset-g_fBottomWaypointOffset) * g_fPathLevelOffset;
+		dest = reachableWps[ix]->GetPosition().AddZ(offset);
 	}
 	return dest;
 }
@@ -1894,16 +1881,14 @@ void PathPlannerWaypoint::RegisterGameGoals()
 
 void PathPlannerWaypoint::GetPath(Path &_path, int _smoothiterations)
 {
-	const float fWpHeight = g_fTopWaypointOffset-g_fBottomWaypointOffset;
-	const float fWpHalfHeight = fWpHeight * g_fPathLevelOffset;
+	const float offset = g_fBottomWaypointOffset + (g_fTopWaypointOffset-g_fBottomWaypointOffset) * g_fPathLevelOffset;
 	
 	bool bFirst = true;
 	while(!m_Solution.empty())
 	{
 		// Center the waypoint position according to offsets.
 		Waypoint *pWp = m_Solution.back();
-		Vector3f vWpPos = pWp->GetPosition();
-		vWpPos.z += g_fBottomWaypointOffset + fWpHalfHeight;
+		Vector3f vWpPos = pWp->GetPosition().AddZ(offset);
 
 		if(bFirst)
 		{
@@ -1914,8 +1899,7 @@ void PathPlannerWaypoint::GetPath(Path &_path, int _smoothiterations)
 				if(m_Client && !pWp->OnPathThrough())
 				{
 					Waypoint *pWp2 = m_Solution[m_Solution.size()-2];
-					Vector3f vNextWpPos = pWp2->GetPosition();
-					vNextWpPos.z += g_fBottomWaypointOffset + fWpHalfHeight;
+					Vector3f vNextWpPos = pWp2->GetPosition().AddZ(offset);
 					Vector3f vClosest;
 					float t = Utils::ClosestPtOnLine(vWpPos, vNextWpPos, m_Client->GetPosition(), vClosest);
 					if(t > 0.f) //bot is near connection between the first and second waypoint
@@ -1957,24 +1941,19 @@ obuint32 PathPlannerWaypoint::SelectWaypoints(const AABB &_box)
 	return iNumSelected;
 }
 
-void PathPlannerWaypoint::RunPathQuery(const PathQuery &_qry)
-{
-}
-
 bool PathPlannerWaypoint::GroundPosition(Vector3f &out, const Vector3f &p, bool offsetforwp)
 {
 	obTraceResult tr;
-	EngineFuncs::TraceLine(tr,p+Vector3f(0.f,0.f,32.f),p+Vector3f(0.f,0.f,-2048.f),NULL,TR_MASK_FLOODFILL,-1,False);
-	out = Vector3f(tr.m_Endpos) - Vector3f(0.f,0.f,offsetforwp?g_fBottomWaypointOffset:0.f);
+	EngineFuncs::TraceLine(tr,p.AddZ(32),p.AddZ(-2048),NULL,TR_MASK_FLOODFILL,-1,False);
+	out = Vector3f(tr.m_Endpos).AddZ(offsetforwp ? -g_fBottomWaypointOffset : 0);
 	return tr.m_Fraction < 1.f && !tr.m_StartSolid;
 }
 
 void PathPlannerWaypoint::SliceLink(Waypoint *wp0, Waypoint *wp1, float _maxlen)
 {
-	const float fWpHeight = g_fTopWaypointOffset - g_fBottomWaypointOffset;
-
-	Vector3f wp0mid = wp0->GetPosition() + Vector3f(0.f,0.f,g_fBottomWaypointOffset+fWpHeight*0.5f);
-	Vector3f wp1mid = wp1->GetPosition() + Vector3f(0.f,0.f,g_fBottomWaypointOffset+fWpHeight*0.5f);
+	const float mid = (g_fTopWaypointOffset + g_fBottomWaypointOffset)/2;
+	Vector3f wp0mid = wp0->GetPosition().AddZ(mid);
+	Vector3f wp1mid = wp1->GetPosition().AddZ(mid);
 
 	float fLinkLen = Length(wp0mid, wp1mid);
 
@@ -2131,10 +2110,7 @@ void PathPlannerWaypoint::RemoveEntityConnection(GameEntity _ent)
 
 Vector3f PathPlannerWaypoint::GetDisplayPosition(const Vector3f &_pos)
 {
-	Vector3f dp = _pos;
-	const float fWpHeight = g_fTopWaypointOffset - g_fBottomWaypointOffset;
-	dp.z += g_fBottomWaypointOffset + (fWpHeight*0.5f);
-	return dp;
+	return _pos.AddZ((g_fTopWaypointOffset + g_fBottomWaypointOffset)/2);
 }
 
 void PathPlannerWaypoint::_FindAllReachable(Client *_client, const Vector3f &_pos, const NavFlags &_team, WaypointList & reachable) {

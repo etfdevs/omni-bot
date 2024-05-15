@@ -56,10 +56,31 @@ namespace Priority
 
 namespace Utils
 {
-	bool RegexMatch( const char * exp, const char * str ) {		
+	bool RegexMatch( const char * exp, const char * str )
+	{		
+		for(; ; exp++, str++)
+		{
+			char e = *exp, s = *str;
+			if(!e) return !s;
+			if(e == s) continue;
+			if(e >= 'A' && e <= 'Z')
+			{
+				if(e + ('a' - 'A') == s) continue;
+				return false;
+			}
+			if(e >= 'a' && e <= 'z')
+			{
+				if(e - ('a' - 'A') == s) continue;
+				return false;
+			}
+			if(e == '_' || e >= '0' && e <= '9') return false;
+			break;
+		}
+
+		if(exp[0]=='.' && exp[1]=='*' && exp[2]=='\0') return true;
+
 		try
 		{
-			if(exp[0]=='.' && exp[1]=='*' && exp[2]=='\0') return true;
 			boost::regex expression( exp, REGEX_OPTIONS );
 			return boost::regex_match( str, expression );
 		}
@@ -300,11 +321,11 @@ namespace Utils
 		try
 		{
 			// Look for JUST the file in the current folder first.
-			if(fs::exists(_file.leaf()))
-				return _file.leaf();
+			if(fs::exists(_file.filename()))
+				return _file.filename();
 
 			// Look for the file using the full provided path, if it differs from just the filename
-			if((_file.string() != _file.leaf()) && fs::exists(_file))
+			if((_file.string() != _file.filename()) && fs::exists(_file))
 				return _file;
 
 			// Look in the system path for the file.
@@ -321,11 +342,11 @@ namespace Utils
 					try
 					{
 						// search for the just the file or the whole path
-						fs::path checkPath = fs::path(*it) / fs::path(_file.leaf());
+						fs::path checkPath = fs::path(*it) / fs::path(_file.filename());
 						if(fs::exists(checkPath) && !fs::is_directory(checkPath))
 							return checkPath;
 
-						if (_file.string() != _file.leaf())
+						if (_file.string() != _file.filename())
 						{
 							checkPath = fs::path(*it) / fs::path(_file);
 							if(fs::exists(checkPath) && !fs::is_directory(checkPath))
@@ -403,13 +424,13 @@ namespace Utils
 			if(fs::exists(pathOverride) && !fs::is_directory(pathOverride))
 			{
 				basePath = fs::path(pPathOverride);
-				basePath = basePath.branch_path();
+				basePath = basePath.parent_path();
 			}
 
 			if(basePath.empty())
 			{
-				basePath = Utils::FindFile(pathOverride.leaf());
-				basePath = basePath.branch_path();
+				basePath = Utils::FindFile(pathOverride.filename());
+				basePath = basePath.parent_path();
 			}
 		}
 		catch(const std::exception & ex)
@@ -437,20 +458,7 @@ namespace Utils
 
 	bool GetLocalGroundPosition(Vector3f &_pos, int _tracemask)
 	{
-		obTraceResult tr;
-		Vector3f vPos;
-		if(GetLocalEyePosition(vPos))
-		{
-			EngineFuncs::TraceLine(tr, vPos, vPos - Vector3f::UNIT_Z * 4096.f, 
-				NULL, _tracemask, GetLocalGameId(), False);
-
-			if(tr.m_Fraction < 1.f)
-			{
-				_pos = tr.m_Endpos;
-				return true;
-			}
-		}
-		return false;
+		return GetLocalGroundPosition(_pos, NULL, _tracemask);
 	}
 
 	bool GetLocalGroundPosition(Vector3f &_pos, Vector3f *_normal, int _tracemask /*= TR_MASK_FLOODFILL*/)
@@ -459,7 +467,7 @@ namespace Utils
 		Vector3f vPos;
 		if(GetLocalEyePosition(vPos))
 		{
-			EngineFuncs::TraceLine(tr, vPos, vPos - Vector3f::UNIT_Z * 4096.f, 
+			EngineFuncs::TraceLine(tr, vPos, vPos.AddZ(-4096), 
 				NULL, _tracemask, GetLocalGameId(), False);
 
 			if(tr.m_Fraction < 1.f)
@@ -589,13 +597,13 @@ namespace Utils
 		if(_list.size()>1)
 		{
 			if(_vertheight > 0.f)
-				DrawLine(_list[0], _list[0] + Vector3f::UNIT_Z * _vertheight, _vertcolor, _time);
+				DrawLine(_list[0], _list[0].AddZ(_vertheight), _vertcolor, _time);
 			for(obuint32 i = 1; i < _list.size(); ++i)
 			{
 				Utils::DrawLine(_list[i-1], _list[i], _color, _time);
 
 				if(_vertheight > 0.f)
-					DrawLine(_list[i], _list[i] + Vector3f::UNIT_Z * _vertheight, _vertcolor, _time);
+					DrawLine(_list[i], _list[i].AddZ(_vertheight), _vertcolor, _time);
 			}
 			if(_closed)
 				DrawLine(_list.back(), _list.front(), _color, _time);
@@ -607,13 +615,13 @@ namespace Utils
 		if(_indices.size()>1)
 		{
 			if(_vertheight > 0.f)
-				DrawLine(_vertices[_indices[0]], _vertices[_indices[0]] + Vector3f::UNIT_Z * _vertheight, _vertcolor, _time);
+				DrawLine(_vertices[_indices[0]], _vertices[_indices[0]].AddZ(_vertheight), _vertcolor, _time);
 			for(obuint32 i = 1; i < _indices.size(); ++i)
 			{
 				Utils::DrawLine(_vertices[_indices[i-1]], _vertices[_indices[i]], _color, _time);
 
 				if(_vertheight > 0.f)
-					DrawLine(_vertices[_indices[i]], _vertices[_indices[i]] + Vector3f::UNIT_Z * _vertheight, _vertcolor, _time);
+					DrawLine(_vertices[_indices[i]], _vertices[_indices[i]].AddZ(_vertheight), _vertcolor, _time);
 			}
 			if(_closed)
 				DrawLine(_vertices[_indices.front()], _vertices[_indices.back()], _color, _time);
@@ -1759,8 +1767,9 @@ std::ostream& operator <<(std::ostream& _o, const TriggerInfo_t& _ti)
 
 //////////////////////////////////////////////////////////////////////////
 
-KeyValueIni		*FileOptions = 0;
-bool			OptionsChanged = false;
+static KeyValueIni *FileOptions = 0;
+static bool	OptionsChanged = false;
+static bool OptionsInHomePath;
 
 void Options::Init()
 {
@@ -1799,35 +1808,58 @@ bool Options::LoadConfigFile(const String &_file)
 	return false;
 }
 
-bool Options::SaveConfigFile(const String &_file)
+bool Options::LoadConfigFile()
 {
-	if(FileOptions)
+	if(LoadConfigFile("homepath/omni-bot.cfg"))
 	{
-		File f;
-		if(f.OpenForWrite(_file.c_str(),File::Text))
-		{
-			obuint32 FileLength = 0;
-			void *FileData = saveKeyValueIniMem(FileOptions,FileLength);
-
-			f.Write(FileData,FileLength);
-			f.Close();
-
-			releaseIniMem(FileData);
-			return true;
-		}
+		OptionsInHomePath = true;
+		return true;
 	}
-	return false;
+	OptionsInHomePath = false;
+	return LoadConfigFile("user/omni-bot.cfg") || LoadConfigFile("config/omni-bot.cfg");
 }
 
-bool Options::SaveConfigFileIfChanged(const String &_file) 
+void Options::SaveConfigFileIfChanged() 
 {
-	if(OptionsChanged)
-	{
-		OptionsChanged = false;
-		return SaveConfigFile(_file);
-	}
-	return false;
+	if(!OptionsChanged || !FileOptions) return;
+	OptionsChanged = false;
+	File f;
+	/*
+		GetLogPath() should return "fs_homepath" cvar
+		Windows ETL: C:\Users\username\Documents\ETLegacy
+		Windows ET 2.6: C:\Program Files (x86)\Wolfenstein - Enemy Territory
+		Windows ioRTCW: C:\Users\username\Documents\RTCW
+		Linux ETL: /home/username/.etlegacy
+		Linux ET 2.6: /home/username/.etwolf
+		Linux RTCW: /home/username/.wolf
+		Mac ETL: /Users/username/Library/Application Support/etlegacy
+	*/
 
+	//If the config has been loaded from fs_homepath, save it to fs_homepath
+	if(OptionsInHomePath && FileSystem::SetWriteDirectory(g_EngineFuncs->GetLogPath())
+		&& !f.OpenForWrite("omni-bot.cfg", File::Text)) 
+		FileSystem::SetWriteDirectory(Utils::GetModFolder());
+	//Otherwise save it to omni-bot installation folder
+	if(!f.IsOpen() && !f.OpenForWrite("user/omni-bot.cfg", File::Text) 
+		//If it failed (access denied), save it to fs_homepath
+		&& !OptionsInHomePath && FileSystem::SetWriteDirectory(g_EngineFuncs->GetLogPath()))
+	{
+		OptionsInHomePath = true;
+		f.OpenForWrite("omni-bot.cfg", File::Text);
+	}
+	if(f.IsOpen()) 
+	{
+		obuint32 fileLength = 0;
+		void *fileData = saveKeyValueIniMem(FileOptions, fileLength);
+		if(fileData)
+		{
+			f.Write(fileData, fileLength);
+			releaseIniMem(fileData);
+		}
+		f.Close();
+	}
+	//restore previous write directory
+	if(OptionsInHomePath) FileSystem::SetWriteDirectory(Utils::GetModFolder());
 }
 
 const char *Options::GetRawValue(const char *_section, const char *_key)

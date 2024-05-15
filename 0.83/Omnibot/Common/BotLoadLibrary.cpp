@@ -249,10 +249,14 @@ eomnibot_error Omnibot_LoadLibrary(int version, const char *lib, const char *pat
 		g_BotLibrary = Omnibot_LL(OB_VA("%s" SUFFIX ".dll", lib));
 
 #else
+#ifdef __APPLE__
+#define SUFFIX "_mac"
+#else
 #ifdef __x86_64__
 #define SUFFIX ".x86_64"
 #else
 #define SUFFIX
+#endif
 #endif
 	g_BotLibrary = Omnibot_LL(OB_VA("%s/%s" SUFFIX ".so", path ? path : ".", lib));
 	if(!g_BotLibrary)
@@ -274,7 +278,7 @@ eomnibot_error Omnibot_LoadLibrary(int version, const char *lib, const char *pat
 	}
 	else
 	{
-		Omnibot_Load_PrintMsg(OB_VA("Found Omni-bot: %s, Attempting to Initialize", g_OmnibotLibPath.c_str()));
+		//Omnibot_Load_PrintMsg(OB_VA("Found Omni-bot: %s, Attempting to Initialize", g_OmnibotLibPath.c_str()));
 		pfnGetFunctionsFromDLL pfnGetBotFuncs = 0;
 		memset(&g_BotFunctions, 0, sizeof(g_BotFunctions));
 		pfnGetBotFuncs = (pfnGetFunctionsFromDLL)GetProcAddress(g_BotLibrary, "ExportBotFunctionsFromDLL");
@@ -294,7 +298,7 @@ eomnibot_error Omnibot_LoadLibrary(int version, const char *lib, const char *pat
 		g_IsOmnibotLoaded = (r == BOT_ERROR_NONE);
 		if(g_IsOmnibotLoaded)
 		{
-			Omnibot_Load_PrintMsg("Omni-bot Loaded Successfully");
+			//Omnibot_Load_PrintMsg("Omni-bot Loaded Successfully");
 		}
 		else
 		{

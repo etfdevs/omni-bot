@@ -76,6 +76,12 @@ namespace Utils
 		return (_face1.Dot(_face2) >= cosf(fFovInRadians/2.0f) * _face1.Length() * _face2.Length());
 	}
 
+	//face1 length must be 1
+	inline bool InFieldOfView120(const Vector3f &_face1, const Vector3f &_face2)
+	{
+		return _face1.Dot(_face2) * 2 >= _face2.Length(); // 2 = 1/cos(120/2)
+	}
+
 	inline bool InFieldOfView2d(const Vector3f &_face1, const Vector3f &_face2, float _fovAngles) 
 	{ 
 		Vector2f v1 = (Vector2f)_face1;
@@ -449,10 +455,8 @@ class Options
 public:
 	static void Init();
 	static void Shutdown();
-	static bool LoadConfigFile(const String &_file);
-	static bool SaveConfigFile(const String &_file);
-
-	static bool SaveConfigFileIfChanged(const String &_file);
+	static bool LoadConfigFile();
+	static void SaveConfigFileIfChanged();
 
 	static const char *GetRawValue(const char *_section, const char *_key);
 
@@ -466,6 +470,8 @@ public:
 	static bool SetValue(const char *_section, const char *_key, float _val, bool _overwrite = true);
 	static bool SetValue(const char *_section, const char *_key, const char *_val, bool _overwrite = true);
 	static bool SetValue(const char *_section, const char *_key, const String &_val, bool _overwrite = true);
+private:
+	static bool LoadConfigFile(const String &_file);
 };
 
 //////////////////////////////////////////////////////////////////////////

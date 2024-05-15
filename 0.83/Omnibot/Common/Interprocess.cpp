@@ -43,7 +43,6 @@ private:
 	const String	m_Name;
 	message_queue	m_MessageQueue;
 
-	InterProcessMessageQueue();
 };
 
 typedef boost::shared_ptr< InterProcessMessageQueue<IPC_DebugDrawMsg> > MessageQueuePtr;
@@ -56,6 +55,8 @@ MessageQueuePtr g_MessageQueue;
 #include <windows.h>
 #else
 #include <dlfcn.h>
+
+#ifndef __APPLE__
 #include <link.h>
 
 static int dl_iterate_callback(struct dl_phdr_info *info, size_t size, void *data)
@@ -75,6 +76,7 @@ static int dl_iterate_callback(struct dl_phdr_info *info, size_t size, void *dat
 	return 0;
 }
 #endif
+#endif
 
 #endif // INTERPROCESS
 
@@ -88,6 +90,13 @@ namespace InterProcess
 
 	//////////////////////////////////////////////////////////////////////////
 
+	void DrawActiveFrame()
+	{
+		PathPlannerBase *pPathPlanner = IGameManager::GetInstance()->GetNavSystem();
+		if(pPathPlanner->IsViewOn())
+			pPathPlanner->DrawActiveFrame();
+	}
+
 	void Init()
 	{
 		Prof_Scope(InterProcess);
@@ -96,7 +105,7 @@ namespace InterProcess
 
 		Vector3f v1(Vector3f::ZERO);
 
-		if(!g_EngineFuncs->DebugLine(v1,v1,COLOR::GREEN,0.f) && 
+		if(!g_EngineFuncs->DebugLine(v1,v1,COLOR::GREEN,0.f) &&
 			!g_EngineFuncs->DebugRadius(v1,0.f,COLOR::GREEN, 0.f))
 		{
 #ifdef INTERPROCESS
@@ -112,6 +121,7 @@ namespace InterProcess
 			}
 #else
 
+
 #ifdef WIN32
 #ifdef _WIN64
 			HMODULE hmod = GetModuleHandle("cgame_mp_x64");
@@ -122,11 +132,16 @@ namespace InterProcess
 				pfnGetClientFunctionsFromDLL pfnGetBotFuncs = (pfnGetClientFunctionsFromDLL)GetProcAddress(hmod, "ExportClientFunctionsFromDLL");
 #else
 			void *hmod = 0;
+#if defined __APPLE__
+			hmod = dlopen(va("%s/omnibot/cgame_mac", g_EngineFuncs->GetLogPath()), RTLD_NOW|RTLD_NOLOAD);
+#else
 			dl_iterate_phdr(dl_iterate_callback, &hmod);
+#endif
 			if(hmod){
 				pfnGetClientFunctionsFromDLL pfnGetBotFuncs = (pfnGetClientFunctionsFromDLL)dlsym(hmod, "ExportClientFunctionsFromDLL");
 #endif
-				if(pfnGetBotFuncs && pfnGetBotFuncs(&g_ClientFuncs, 1)==BOT_ERROR_NONE){
+				if(pfnGetBotFuncs && pfnGetBotFuncs(&g_ClientFuncs, 2)==BOT_ERROR_NONE){
+					g_ClientFuncs->DrawActiveFrame = DrawActiveFrame;
 					LOG("cgame drawing Initialized");
 				}
 				else {
@@ -152,13 +167,17 @@ namespace InterProcess
 
 		Initialized=true;
 	}
-	
+
 	void Shutdown()
 	{
 #ifdef INTERPROCESS
 		g_MessageQueue.reset();
 #else
-		g_ClientFuncs=0;
+		if(g_ClientFuncs)
+		{
+			g_ClientFuncs->DrawActiveFrame = NULL;
+			g_ClientFuncs = 0;
+		}
 #endif
 		Initialized=false;
 	}
@@ -234,7 +253,7 @@ namespace InterProcess
 				msg.data.m_Radius.m_Pos.x = _a.x;
 				msg.data.m_Radius.m_Pos.y = _a.y;
 				msg.data.m_Radius.m_Pos.z = _a.z;
-				
+
 				msg.data.m_Radius.m_Radius = _radius;
 				msg.data.m_Radius.m_Color = _color.rgba();
 				g_MessageQueue->TrySend(msg);
@@ -242,7 +261,7 @@ namespace InterProcess
 #else
 			Init();
 
-			if(g_ClientFuncs) 
+			if(g_ClientFuncs)
 				g_ClientFuncs->DrawRadius(_a, _radius, _color.rgba(), Utils::SecondsToMilliseconds(_time));
 
 #endif // INTERPROCESS

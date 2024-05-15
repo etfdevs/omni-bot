@@ -28,7 +28,7 @@ static PathPlannerWaypoint *GetWpPlanner()
 // Parameters:
 //
 //		<Vector3> - The <Vector3> position to add waypoint.
-//		<Vector3> - The <Vector3> facing for the waypoint.
+//		<Vector3> - OPTIONAL - The <Vector3> facing for the waypoint.
 //
 // Returns:
 //		int - Waypoint Id if successful
@@ -36,14 +36,22 @@ static PathPlannerWaypoint *GetWpPlanner()
 //		nul if there was an error adding waypoint.
 static int GM_CDECL gmfAddWaypoint(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(2);
+	GM_CHECK_NUM_PARAMS(1);
 	GM_CHECK_VECTOR_PARAM(v1,0);
-	GM_CHECK_VECTOR_PARAM(v2,1);
 
 	PathPlannerWaypoint *pWp = GetWpPlanner();
 	if(pWp)
 	{
-		Waypoint *pWaypoint = pWp->AddWaypoint(Vector3f(v1.x,v1.y,v1.z), Vector3f(v2.x,v2.y,v2.z));
+		Waypoint* pWaypoint; 
+
+		if(a_thread->GetNumParams() > 1) 
+		{
+			GM_CHECK_VECTOR_PARAM(v2, 1);
+			pWaypoint = pWp->AddWaypoint(Vector3f(v1.x, v1.y, v1.z), Vector3f(v2.x, v2.y, v2.z));
+		}
+		else {
+			pWaypoint = pWp->AddWaypoint(Vector3f(v1.x, v1.y, v1.z));
+		}
 		if(pWaypoint)
 		{
 			a_thread->PushInt(pWaypoint->GetUID());
@@ -226,15 +234,39 @@ static int GM_CDECL gmfConnectWaypoints(gmThread *a_thread)
 	GM_CHECK_INT_PARAM(guid1, 0);
 	GM_CHECK_INT_PARAM(guid2, 1);
 
-	bool bSuccess = false;
 	PathPlannerWaypoint *pWp = GetWpPlanner();
-	if(pWp)
-	{		
-		Waypoint *pWaypoint1 = pWp->GetWaypointByGUID(guid1);
-		Waypoint *pWaypoint2 = pWp->GetWaypointByGUID(guid2);
-		if(pWaypoint1 != NULL && pWaypoint2 != NULL)
+	bool bSuccess = pWp && pWp->_ConnectWaypoints(pWp->GetWaypointByGUID(guid1), pWp->GetWaypointByGUID(guid2));
+	a_thread->PushInt(bSuccess ? 1 : 0);
+	return GM_OK;
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+// function: DisconnectWaypoints
+//		Disconnects two waypoints.
+//
+// Parameters:
+//
+//		<int> - Guid of a waypoint.
+//		<int> - Guid of another waypoint.
+//
+// Returns:
+//		int - true if successful, false if not
+static int GM_CDECL gmfDisconnectWaypoints(gmThread* a_thread)
+{
+	GM_CHECK_NUM_PARAMS(2);
+	GM_CHECK_INT_PARAM(guid1, 0);
+	GM_CHECK_INT_PARAM(guid2, 1);
+
+	bool bSuccess = false;
+	PathPlannerWaypoint* pWp = GetWpPlanner();
+	if (pWp)
+	{
+		Waypoint* pWaypoint1 = pWp->GetWaypointByGUID(guid1);
+		Waypoint* pWaypoint2 = pWp->GetWaypointByGUID(guid2);
+		if (pWaypoint1 != NULL && pWaypoint2 != NULL)
 		{
-			pWaypoint1->ConnectTo(pWaypoint2);
+			pWaypoint1->DisconnectFrom(pWaypoint2);
 			bSuccess = true;
 		}
 	}
@@ -288,6 +320,8 @@ static int GM_CDECL gmfSetRadius(gmThread *a_thread)
 //		- OR -
 //		<string> - Name of the waypoint.
 //		<string> - The name of the flag to set.
+//		- OR -
+//		<table> - table of flags.
 //		<int> - True to set, false to clear.
 //
 // Returns:
@@ -304,34 +338,64 @@ static int GM_CDECL gmfSetWaypointFlag(gmThread *a_thread)
 	}
 
 	PathPlannerWaypoint::WaypointList list;
-	if(a_thread->ParamType(0) == GM_INT)
+	switch(a_thread->ParamType(0))
 	{
-		GM_CHECK_INT_PARAM(guid, 0);
-		Waypoint *pWaypoint = pWp->GetWaypointByGUID(guid);
-		if(pWaypoint) list.push_back(pWaypoint);
-	} 
-	else if(a_thread->ParamType(0) == GM_STRING)
-	{
-		GM_CHECK_STRING_PARAM(name, 0);
-		Waypoint *pWaypoint = pWp->GetWaypointByName(name);
-		if(pWaypoint) list.push_back(pWaypoint);
-		else pWp->GetWaypointsByExpr(name, list);
+		case GM_INT:
+		{
+			Waypoint *pWaypoint = pWp->GetWaypointByGUID(a_thread->ParamInt(0));
+			if(pWaypoint) list.push_back(pWaypoint);
+			break;
+		}
+		case GM_STRING:
+		{
+			const char *name=a_thread->ParamString(0);
+			pWp->GetWaypointsByName(name, list);
+			if(list.empty()) pWp->GetWaypointsByExpr(name, list);
+			break;
+		}
 	}
 	if(list.size()==0)
 	{
 		GM_EXCEPTION_MSG("Invalid Waypoint specified in param 0");
 		return GM_EXCEPTION;
 	}
-		
-	GM_CHECK_STRING_PARAM(flagname, 1);
-	GM_CHECK_INT_PARAM(enable, 2);
 
-	NavFlags flag;
-	if(!pWp->GetNavFlagByName(flagname, flag))
+	NavFlags flag=0;
+	switch(a_thread->ParamType(1))
 	{
-		GM_EXCEPTION_MSG("Invalid Navigation Flag specified in param 1");
-		return GM_EXCEPTION;
+		case GM_STRING:
+		{
+			const char *flagname = a_thread->ParamString(1);
+			if(!pWp->GetNavFlagByName(flagname, flag))
+			{
+				GM_EXCEPTION_MSG("Invalid navigation flag %s", flagname);
+				return GM_EXCEPTION;
+			}
+			break;
+		}
+		case GM_TABLE:
+		{
+			gmTableObject* tbl = a_thread->ParamTable(1);
+			gmTableIterator tIt;
+			for(gmTableNode *pNode = tbl->GetFirst(tIt); pNode; pNode = tbl->GetNext(tIt))
+			{
+				const char *flagname = pNode->m_value.GetCStringSafe();
+				NavFlags flag1;
+				if(!pWp->GetNavFlagByName(flagname, flag1))
+				{
+					GM_EXCEPTION_MSG("Invalid navigation flag %s", flagname);
+					return GM_EXCEPTION;
+				}
+				flag|=flag1;
+			}
+			break;
+		}
+		default:
+			GM_EXCEPTION_MSG("expecting param 1 as string or table");
+			return GM_EXCEPTION;
 	}
+
+	GM_CHECK_INT_PARAM(enable, 2);
 
 	PathPlannerWaypoint::WaypointList::const_iterator cIt = list.begin(), cItEnd = list.end();
 	for(; cIt != cItEnd; ++cIt)
@@ -531,9 +595,16 @@ static int GM_CDECL gmfGetClosestWaypoint(gmThread *a_thread)
 	return GM_OK;
 }
 
+static int GM_CDECL gmfCheckBlockable(gmThread* a_thread)
+{
+	PathPlannerWaypoint* pWp = GetWpPlanner();
+	if (pWp) a_thread->PushInt(pWp->CheckBlockable());
+	else a_thread->PushNull();
+	return GM_OK;
+}
+
 static int GM_CDECL gmfWaypointSave(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);	
 	GM_STRING_PARAM(wpname,0,0);	
 
 	PathPlannerWaypoint *obj = NULL;
@@ -547,7 +618,6 @@ static int GM_CDECL gmfWaypointSave(gmThread *a_thread)
 
 static int GM_CDECL gmfWaypointLoad(gmThread *a_thread)
 {
-	GM_CHECK_NUM_PARAMS(0);	
 	GM_STRING_PARAM(wpname,0,0);	
 
 	PathPlannerWaypoint *obj = NULL;
@@ -569,6 +639,7 @@ void PathPlannerWaypoint::RegisterScriptFunctions(gmMachine *a_machine)
 		.func(gmfGetWaypointByName, "GetWaypointByName")
 		.func(gmfGetWaypointByUID, "GetWaypointByGUID")
 		.func(gmfConnectWaypoints, "Connect")
+		.func(gmfDisconnectWaypoints, "Disconnect")
 		.func(gmfSetRadius, "SetRadius")
 		.func(gmfSetWaypointFlag, "SetWaypointFlag")
 		.func(gmfSetWaypointProperty, "SetWaypointProperty")
@@ -576,6 +647,7 @@ void PathPlannerWaypoint::RegisterScriptFunctions(gmMachine *a_machine)
 		.func(gmfGetAllWaypoints, "GetAllWaypoints")
 		.func(gmfGetAllSelectedWaypoints, "GetAllSelectedWaypoints")
 		.func(gmfGetClosestWaypoint, "GetClosestWaypoint")
+		.func(gmfCheckBlockable, "CheckBlockable")
 		.func(gmfWaypointSave,"Save")
 		.func(gmfWaypointLoad,"Load")
 		.func((bool (PathPlannerWaypoint::*)())&PathPlannerWaypoint::IsViewOn,"IsWaypointViewOn")

@@ -1,5 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
-// 
+//
 // $LastChangedBy$
 // $LastChangedDate$
 // $LastChangedRevision$
@@ -33,22 +33,17 @@
 // misc
 #include "BotLoadLibrary.cpp"
 #include "CallbackParameters.cpp"
-#include "ChunkedFile.cpp"
 #include "CommandReciever.cpp"
 #include "Criteria.cpp"
 #include "EngineFuncs.cpp"
-#include "Error.cpp"
 #include "FileDownloader.cpp"
 #include "InterfaceFuncs.cpp"
 #include "Interprocess.cpp"
 #include "KeyValueIni.cpp"
 #include "Logger.cpp"
-#include "MessageManager.cpp"
 #include "NameManager.cpp"
 #include "PropertyBinding.cpp"
-#include "QuadTree.cpp"
 #include "Regulator.cpp"
-#include "ResponseCurve.cpp"
 #include "Timer.cpp"
 #include "Trajectory.cpp"
 #include "TriggerManager.cpp"
@@ -68,6 +63,7 @@
 #include "PathPlannerNavMeshBuilder.cpp"
 #include "PathPlannerNavMeshCmds.cpp"
 #include "PathPlannerNavMeshScript.cpp"
+#include "QuadTree.cpp"
 #endif
 
 #include "PathPlannerWaypoint.cpp"
@@ -81,14 +77,11 @@
 #include "WaypointSerializer_V5.cpp"
 #include "WaypointSerializer_V6.cpp"
 #include "WaypointSerializer_V7.cpp"
-#include "WaypointSerializerImp.cpp"
+#include "WaypointSerializer_V9.cpp"
 
-#include "AStarSolver.cpp"
 #include "NavigationManager.cpp"
 #include "Path.cpp"
 #include "PathPlannerBase.cpp"
-#include "PathQuery.cpp"
-#include "ThreatZone.cpp"
 
 #include "gmBotLibrary.cpp"
 #include "gmMathLibrary.cpp"
@@ -115,9 +108,7 @@
 #include "BotSteeringSystem.cpp"
 #include "BotWeaponSystem.cpp"
 #include "FilterAllType.cpp"
-#include "FilterBias.cpp"
 #include "FilterClosest.cpp"
-#include "FilterMostHurt.cpp"
 #include "FilterSensory.cpp"
 #include "ScriptGoal.cpp"
 

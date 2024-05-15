@@ -3,12 +3,14 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
 	<REPO_ROOT>$(SolutionDir)..\..\..\</REPO_ROOT>
-	<BOOST>$(REPO_ROOT)\libs\boost\boost_1_44</BOOST>
+	<BOOST>$(REPO_ROOT)\libs\boost\boost_1_85_0</BOOST>
 	<InterfaceDir>$(REPO_ROOT)\GameInterfaces</InterfaceDir>
 	<OMNIBOT_INST>$(REPO_ROOT)\Installer\Files</OMNIBOT_INST>
 	<REMOTEDEBUGLIB>$(REPO_ROOT)\Tools\RemoteDebugWindow\RemoteDebugLib</REMOTEDEBUGLIB>
 	<ETDIR>C:\games\Wolfenstein - Enemy Territory</ETDIR>
 	<RTCWDIR>C:\games\Return to Castle Wolfenstein</RTCWDIR>
+	<ET_INST>$(ETDIR)\omni-bot</ET_INST>
+	<RTCW_INST>$(RTCWDIR)\omni-bot</RTCW_INST>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
