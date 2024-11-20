@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __WAYPOINT_H__
 #define __WAYPOINT_H__
 
@@ -36,7 +28,7 @@ public:
 	//	Represents a connection to another waypoint.
 	//	Contains a pointer to the other waypoint, as well as a
 	//	variable to hold flags for the connection.
-	typedef struct {
+	struct ConnectionInfo {
 		Waypoint		*m_Connection;
 		obuint32		m_ConnectionFlags;
 		bool CheckFlag(unsigned int _flag) const { return CheckBitT<unsigned int>(m_ConnectionFlags, _flag); }
@@ -47,7 +39,7 @@ public:
 		typedef RemoteLib::SyncSnapshot<12> ConnectionSnapShot;
 		ConnectionSnapShot	snapShot;
 #endif
-	} ConnectionInfo;
+	};
 	typedef std::list<ConnectionInfo> ConnectionList;
 	
 	PropertyMap &GetPropertyMap() { return m_PropertyList; }

@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompCommon.h"
 #include "gmConfig.h"
 #include "gmSystemLibApp.h"
@@ -47,7 +39,7 @@ GMBIND_FUNCTION_MAP_BEGIN( gmFile )
 	GMBIND_FUNCTION( "ReadLine", gmfReadLine )	
 
 	GMBIND_FUNCTION( "Write", gmfWrite )	
-GMBIND_FUNCTION_MAP_END();
+GMBIND_FUNCTION_MAP_END()
 
 GMBIND_PROPERTY_MAP_BEGIN( gmFile )
 GMBIND_PROPERTY_MAP_END();

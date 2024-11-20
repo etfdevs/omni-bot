@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __GM_BOT_H__
 #define __GM_BOT_H__
 
@@ -40,7 +32,6 @@ public:
 	static int gmfGetLastTarget(gmThread *a_thread);
 	static int gmfForceTarget(gmThread *a_thread);
 	static int gmfGetTargetInfo(gmThread *a_thread);
-	static int gmfIgnoreTargetForTime(gmThread *a_thread);
 	static int gmfIgnoreTarget(gmThread *a_thread);
 	static int gmfGetWeapon(gmThread *a_thread);
 	static int gmfGetIsAllied(gmThread *a_thread);

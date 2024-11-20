@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __GOALMANAGER_H__
 #define __GOALMANAGER_H__
 
@@ -139,6 +131,7 @@ public:
 	
 	void GetGoals(Query &_qry);
 	int Iterate(const char *expression, std::function<void(MapGoal*)> action);
+	int Iterate(gmThread *a_thread, gmVariable &expression, const char *function, bool ignoreErrors, std::function<void(MapGoal *)> action);
 	MapGoalPtr GetGoal(const String &_goalname);
 	MapGoalPtr GetGoal(int _serialNum);
 

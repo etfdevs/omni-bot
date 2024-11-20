@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompCommon.h"
 #include "NameManager.h"
 #include "ScriptManager.h"
@@ -52,8 +44,8 @@ IGame::IGame()
 	: m_StateRoot(0)
 	, m_NumDeletedThreads(0)
 	, m_WeaponClassIdStart(0)
-	, m_bDrawBlockableTests	(false)
 	, m_PlayersChanged(true)
+	, m_bDrawBlockableTests	(false)
 {
 }
 
@@ -63,7 +55,7 @@ IGame::~IGame()
 
 const char *IGame::GetVersion() const
 {
-	return "0.9";
+	return "0.91";
 }
 
 const char *IGame::GetVersionDateTime() const

@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __ENGINEFUNCS_H__
 #define __ENGINEFUNCS_H__
 
@@ -38,7 +30,7 @@ namespace EngineFuncs
 
 	void ConsoleMessage(const char* _msg);
 	void ConsoleError(const char* _msg);
-};
+}
 
 namespace Constants {
 	enum Internal { MAX_PLAYERS = 64, MAX_ENTITIES = 4096, MAX_TEAMS = 4 };

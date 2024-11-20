@@ -1,22 +1,12 @@
-////////////////////////////////////////////////////////////////////////////////
-//
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-// file: Commonly included headers
-//		In order to reduce the clutter in every file that commonly includes
-//		some headers, such as STL headers and utility headers, we put them
-//		in here so that those files can just include this and get access to
-//		all the common stuff.
-//
-////////////////////////////////////////////////////////////////////////////////
+//Commonly included headers
+//In order to reduce the clutter in every file that commonly includes
+//some headers, such as STL headers and utility headers, we put them
+//in here so that those files can just include this and get access to all the common stuff.
 
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
 //#include "CodeAnalysis.h"
-
 
 // Disable some compiler warnings.
 #ifdef _MSC_VER
@@ -96,7 +86,7 @@ namespace stdext
     using std::unordered_map;
     using std::hash;
     using std::equal_to;
-};
+}
 
 #ifdef WIN32
 	//#define ENABLE_REMOTE_DEBUGGER
@@ -334,7 +324,7 @@ enum MoveMode
 		bShowAssert = Utils::AssertFunction((bool)((f)!=0), #f, __FILE__, __LINE__, __VA_ARGS__); \
 	} }
 #else	// !DEBUG
-#define OBASSERT(f, sz, ...) (f)
+#define OBASSERT(f, sz, ...) (void)(f)
 #endif	// !DEBUG
 
 #endif

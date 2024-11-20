@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __PATHPLANNERNAVMESH_H__
 #define __PATHPLANNERNAVMESH_H__
 
@@ -36,7 +28,7 @@ enum ToolStateNavMesh
 namespace NavigationMeshOptions
 {
 	extern float CharacterHeight;
-};
+}
 
 // class: PathPlannerNavMesh
 //		Path planner interface for the navmesh system for hl2

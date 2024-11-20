@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __INTERFACEFUNCS_H__
 #define __INTERFACEFUNCS_H__
 
@@ -64,6 +56,6 @@ namespace InterfaceFuncs
 		MessageHelper msg(GEN_MSG_SETLOADOUT, &_info, sizeof(T));
 		return SUCCESS(InterfaceMsg(msg,_ent));
 	}
-};
+}
 
 #endif

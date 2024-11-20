@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompCommon.h"
 #include "gmTargetInfo.h"
 
@@ -16,7 +8,7 @@ GMBIND_INIT_TYPE( gmTargetInfo, "TargetInfo" );
 
 GMBIND_FUNCTION_MAP_BEGIN( gmTargetInfo )
 	GMBIND_FUNCTION( "IsA", gmIsA )
-GMBIND_FUNCTION_MAP_END();
+GMBIND_FUNCTION_MAP_END()
 
 // property: Distance
 //		The distance this target is from the bot.

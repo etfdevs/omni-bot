@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __BEZIER_H__
 #define __BEZIER_H__
 
@@ -100,7 +92,7 @@ private:
 	Vector3<Real> m_P1, m_P2, m_P3, m_P4;
 };
 
-};
+}
 
 typedef Wm3::Bezier2<float> Bezier2f;
 typedef Wm3::Bezier2<double> Bezier2d;

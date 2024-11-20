@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-//
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __BOTSENSORYMEMORY_H__
 #define __BOTSENSORYMEMORY_H__
 
@@ -206,5 +198,5 @@ namespace AiState
 		static pfnCanSensoreEntity		m_pfnCanSensoreEntity;
 	private:
 	};
-};
+}
 #endif

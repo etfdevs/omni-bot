@@ -1,13 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-// Title: RTCW Message Structure Definitions
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __RTCW_MESSAGES_H__
 #define __RTCW_MESSAGES_H__
 
@@ -146,7 +136,7 @@ struct RTCW_CvarSet
 
 struct RTCW_CvarGet
 {
-	char *		m_Cvar;
+	const char *m_Cvar;
 	int			m_Value;
 };
 

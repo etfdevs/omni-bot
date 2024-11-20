@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompCommon.h"
 #include "BotWeaponSystem.h"
 #include "Client.h"
@@ -794,4 +786,4 @@ namespace AiState
 		return NumWeaponIds ? (WeaponIds[rand() % NumWeaponIds]) : 0;
 	}
 	
-};
+}

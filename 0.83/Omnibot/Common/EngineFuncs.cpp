@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompCommon.h"
 #include "EngineFuncs.h"
 #include "Utilities.h"
@@ -233,7 +225,7 @@ namespace EngineFuncs
 		g_EngineFuncs->PrintError(_msg);
 		//ThreadAddError(_msg);
 	}
-};
+}
 
 
 

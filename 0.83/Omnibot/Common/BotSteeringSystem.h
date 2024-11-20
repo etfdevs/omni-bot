@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __BOTSTEERINGSYSTEM_H__
 #define __BOTSTEERINGSYSTEM_H__
 
@@ -93,5 +85,5 @@ namespace AiState
 		enum Deceleration{slow = 3, normal = 2, fast = 1};
 		float _Arrive(const Vector3f &_targetPos, Deceleration _deceleration);
 	};
-};
+}
 #endif

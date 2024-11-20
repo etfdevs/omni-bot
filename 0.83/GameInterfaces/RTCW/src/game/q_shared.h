@@ -5,7 +5,7 @@
 // A user mod should never modify this file
 
 #define Q3_VERSION      "Wolf 1.41-MP"
-#define OB_VERSION      "0.9"
+#define OB_VERSION      "0.91"
 #define OMNIBOT_URL "www.omni-bot.com"
 // 1.4-MP : (== 1.34)
 // 1.3-MP : final for release
@@ -80,6 +80,7 @@ typedef int intptr_t;
 #include <time.h>
 #include <ctype.h>
 #include <limits.h>
+#include <stdint.h>
 
 #endif
 
@@ -87,8 +88,6 @@ typedef int intptr_t;
 
 //#pragma intrinsic( memset, memcpy )
 
-#else
-#include <stdint.h>
 #endif
 
 

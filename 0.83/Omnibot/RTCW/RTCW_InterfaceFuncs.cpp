@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompRTCW.h"
 #include "RTCW_InterfaceFuncs.h"
 
@@ -38,7 +30,7 @@ namespace InterfaceFuncs
 		return true;
 	}
 
-	int GetCvar(char *_cvar)
+	int GetCvar(const char *_cvar)
 	{
 		if (_cvar)
 		{
@@ -49,7 +41,7 @@ namespace InterfaceFuncs
 			InterfaceMsg(msg);
 			return data.m_Value;
 		}
-		return NULL;
+		return 0;
 	}
 	
 	bool IsWeaponOverheated(Client *_bot, RTCW_Weapon _weapon)
@@ -242,4 +234,4 @@ namespace InterfaceFuncs
 		InterfaceMsg(msg, _ent);
 		return data.m_PlayerClass;
 	}
-};
+}

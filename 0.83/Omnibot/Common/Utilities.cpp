@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #include "PrecompCommon.h"
 
 #include "Interprocess.h"
@@ -50,7 +42,7 @@ namespace Priority
 			return str[n];
 		return "";
 	}
-};
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -65,15 +57,19 @@ namespace Utils
 			if(e == s) continue;
 			if(e >= 'A' && e <= 'Z')
 			{
-				if(e + ('a' - 'A') == s) continue;
-				return false;
+				if(e + ('a' - 'A') == s) continue; //case insensitive
 			}
-			if(e >= 'a' && e <= 'z')
+			else if(e >= 'a' && e <= 'z')
 			{
 				if(e - ('a' - 'A') == s) continue;
-				return false;
 			}
-			if(e == '_' || e >= '0' && e <= '9') return false;
+			else if(e != '_' && !(e >= '0' && e <= '9'))
+			{
+				if(e == '*' || e == '\\' && exp[1] == '{') exp--, str--; //repeat last char
+				break;
+			}
+			e = exp[1];
+			if(e != '*' && e != '\\') return false;
 			break;
 		}
 
@@ -1561,7 +1557,7 @@ namespace Utils
 		};
 		return gmVariable::s_null;
 	}
-};
+}
 
 //////////////////////////////////////////////////////////////////////////
 
@@ -1751,8 +1747,8 @@ std::ostream& operator <<(std::ostream& _o, const obUserData_t& _bud)
 std::ostream& operator <<(std::ostream& _o, const TriggerInfo_t& _ti)
 {
 	_o << "Trigger:";
-	if(_ti.m_TagName) _o << " TagName: " << _ti.m_TagName;
-	if(_ti.m_Action) _o << " Action: " << _ti.m_Action;
+	if(*_ti.m_TagName) _o << " TagName: " << _ti.m_TagName;
+	if(*_ti.m_Action) _o << " Action: " << _ti.m_Action;
 	if(_ti.m_Entity.IsValid())
 		_o << " Entity: (" << _ti.m_Entity.GetIndex() << ":" << _ti.m_Entity.GetSerial() << ")";
 	else
@@ -1833,6 +1829,7 @@ void Options::SaveConfigFileIfChanged()
 		Linux ET 2.6: /home/username/.etwolf
 		Linux RTCW: /home/username/.wolf
 		Mac ETL: /Users/username/Library/Application Support/etlegacy
+		Mac ioRTCW: /Users/username/Library/Application Support/RTCW
 	*/
 
 	//If the config has been loaded from fs_homepath, save it to fs_homepath

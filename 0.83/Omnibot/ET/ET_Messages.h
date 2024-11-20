@@ -1,13 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-// Title: TF Message Structure Definitions
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __TF_MESSAGES_H__
 #define __TF_MESSAGES_H__
 
@@ -233,7 +223,7 @@ struct ET_CvarSet
 
 struct ET_CvarGet
 {
-	char *		m_Cvar;
+	const  char *		m_Cvar;
 	int			m_Value;
 };
 

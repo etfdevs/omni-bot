@@ -1,11 +1,3 @@
-////////////////////////////////////////////////////////////////////////////////
-// 
-// $LastChangedBy$
-// $LastChangedDate$
-// $LastChangedRevision$
-//
-////////////////////////////////////////////////////////////////////////////////
-
 #ifndef __ET_INTERFACEFUNCS_H__
 #define __ET_INTERFACEFUNCS_H__
 
@@ -47,9 +39,9 @@ namespace InterfaceFuncs
 	bool FireTeamGetInfo(Client *_bot, ET_FireTeamInfo&data);
 
 	bool SetCvar(char *_cvar, char *_value);
-	int GetCvar(char *_cvar);
+	int GetCvar(const char *_cvar);
 	int GetGameType();
 	void DisableBotPush(Client *_bot, int _push);
-};
+}
 
 #endif
